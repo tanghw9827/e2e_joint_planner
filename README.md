@@ -1020,23 +1020,23 @@ L_imitation = smooth_l1(model_traj, executed_traj)
 ##### ⑧ 典型场景
 路口红灯停车：
 
-![](assets/asset_15.png)
+![](assets/asset_15.gif)
 
 路口绿灯通行：
 
-![](assets/asset_16.png)
+![](assets/asset_16.gif)
 
 横穿车让行：
 
-![](assets/asset_17.png)
+![](assets/asset_17.gif)
 
 cut_in避让超车：
 
-![](assets/asset_18.png)
+![](assets/asset_18.gif)
 
 cut_in让行：
 
-![](assets/asset_19.png)
+![](assets/asset_19.gif)
 
 借道绕行：
 
@@ -1107,7 +1107,7 @@ cut_in碰撞风险：
 ###### 场景构建
 每个合理的横向模态构成一个独立场景，各场景构造参考输入及边界约束，分别进入下游 iLQR 联合优化，最终按代价最小选择最优场景执行。
 
-![](assets/asset_32.gif)
+![](assets/asset_32.png)
 
 联合优化的输入：
 
@@ -1128,11 +1128,11 @@ cut_in碰撞风险：
 
 车道保持场景：
 
-![](assets/asset_33.gif)
+![](assets/asset_33.jpeg)
 
 变道场景：
 
-![](assets/asset_34.gif)
+![](assets/asset_34.jpeg)
 
 参考文献：
 
@@ -1148,7 +1148,7 @@ cut_in碰撞风险：
 
 
 
-![](assets/asset_35.gif)
+![](assets/asset_35.png)
 
 使用中间时刻航向角（减少线性近似误差）：
 
@@ -1174,7 +1174,7 @@ $ a_{i+1} = a_i + j \Delta t $
 
 
 
-![](assets/asset_36.gif)
+![](assets/asset_36.png)
 
 ---
 
@@ -1618,7 +1618,7 @@ void ReferenceCostTerm::GetGradientHessian(
 
 **多圆盘模型**：
 
-![](assets/asset_37.png)    ![](assets/asset_38.jpeg)   
+![](assets/asset_37.png)    ![](assets/asset_38.png)   
 
 + 自车：3 个圆盘，中心沿车身纵轴分布于 $ L, 3L, 5L $（$ L = \text{length}/6 $），半径 $ r_{ego} = \sqrt{L^2 + (w/2)^2} $
 + 障碍物：动态圆盘数（基于长宽比 $ n = \min(6, \max(2, 2 \cdot l/w)) $），半径 $ r_{obs} = \sqrt{(l/(2n))^2 + (w/2)^2} $
@@ -1646,7 +1646,7 @@ $ \frac{\partial^2 J}{\partial x_i \partial x_j} = w \cdot e^{violation} \left( 
 
 
 
-![](assets/asset_39.jpeg)
+![](assets/asset_39.png)
 
 **代码实现：**
 
@@ -3465,21 +3465,21 @@ $ f_m = 1 - \pi_0^{(i)} $
 ##### ⑦ 实车效果
 非规则路口直行：
 
-![](assets/asset_43.png)
+![](assets/asset_43.gif)
 
 路口左转：
 
-![](assets/asset_44.png)大曲率弯道：
+![](assets/asset_44.gif)大曲率弯道：
 
-![](assets/asset_45.png)
+![](assets/asset_45.gif)
 
 侧方车避让：
 
-![](assets/asset_46.png)
+![](assets/asset_46.gif)
 
 拨杆变道：
 
-![](assets/asset_47.png)
+![](assets/asset_47.gif)
 
 避让施工区域：
 
