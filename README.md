@@ -9,15 +9,15 @@
 + 每新增一条规则可能与已有规则冲突，系统复杂度随场景数指数增长
 + 典型场景：超长异型车
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779531228408-a10d9a87-e8c9-4d47-9592-373b59d5f0c4.gif)
+![](assets/asset_01.gif)
 
 + 典型场景：倒地水马
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779531362677-d8316094-81d3-4f37-97e0-fe6d7ec41e39.gif)
+![](assets/asset_02.gif)
 
 + 典型场景：雪地行驶，不变道
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779532161269-df3b787b-a888-46de-87ec-683277e52851.gif)
+![](assets/asset_03.gif)
 
 #### 1.1.2 缺乏交互建模，行为保守
 + 规则系统将他车视为"按预测轨迹运动的障碍物"，不建模自车行为对他车的影响
@@ -25,23 +25,23 @@
 + 结果：系统倾向于保守等待，效率低下，不拟人，以及无法识别意图碰撞风险
 + 典型场景：他车连续掉头，持续让行
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779531656666-019be70c-74db-40f6-9796-bd50c1f7779e.gif)
+![](assets/asset_04.gif)
 
 + 典型场景：自车与他车同时变道，不加速抢行
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779532371621-726b5176-b907-447c-8543-916d1b19adda.gif)
+![](assets/asset_05.gif)
 
 + 典型场景：进入对向车道不起步
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779530955114-5238f7d0-f89d-4f27-be0b-a7f14cddb3b8.gif)
+![](assets/asset_06.gif)
 
 + 典型场景：他车遮挡变道减速不足
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1778743177779-cad83bc6-c6b0-490a-8933-37123059027c.gif)
+![](assets/asset_07.gif)
 
 + 典型场景：鬼探头减速不足
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779529940753-c110d1bf-f234-4bc9-adb3-cececca1032b.gif)
+![](assets/asset_08.gif)
 
 ### 1.2 路径-速度解耦规划局限性
 **路径-速度解耦架构**（Path-Speed Decoupling），虽然工程成熟度高、计算效率可控，但存在以下核心瓶颈：
@@ -51,7 +51,7 @@
 
 **典型场景**：窄道会车
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1778485144952-6a200747-c8df-4e2d-86d3-85b12011d246.gif)
+![](assets/asset_09.gif)
 
 + **问题表现**：对向车侵入自车道，自车横向避让不足，急刹接管
 + **根本原因**：横向规划时未考虑纵向减速配合，解空间受限
@@ -62,7 +62,7 @@
 
 **典型场景**：汇流并道
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1778486214368-09cab062-1d18-4bc9-9482-16bbe5270964.gif)
+![](assets/asset_10.gif)
 
 + **问题表现**：自车向左汇流时，自车对前方车辆进行较大减速避让，汇入主路时距离后车过近造成恐慌感
 + **根本原因**：解耦决策无法根据他车意图（抢行/让行）动态调整，只能保守让行
@@ -70,7 +70,7 @@
 
 **典型场景**：路口他车近距离抢道
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779530440419-93801096-1d62-4d3a-8848-788c560af2d1.gif)
+![](assets/asset_11.gif)
 
 + **问题表现**：侧方车近距离抢道，持续靠左，自车横向未进行避让，纵向急刹=
 + **根本原因**：预测一旦偏差，横纵独立规划都"看不到"威胁，单维度无法独立解决
@@ -82,16 +82,16 @@
 ### 2.1 整体架构
 **数据流：**
 
-![](https://cdn.nlark.com/yuque/0/2026/jpeg/27299753/1779856838290-dd417dcd-27b1-4833-84ab-c8adf7060a54.jpeg)
+![](assets/asset_12.jpeg)
 
 **整体架构：**
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779679540373-b0879ff6-3a06-4f5a-9807-024768fd8917.png)
+![](assets/asset_13.png)
 
 #### 2.1.1 障碍物决策导向二阶段模型
 **模型架构：**
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1780227830709-a3ebb378-0797-47ce-99ce-e0343a46e720.png)
+![](assets/asset_14.png)
 
 > 模型采用 Encoder-Decoder 架构：Encoder 将场景元素（Agent 历史轨迹、地图、静态障碍物、红绿灯、导航信息）统一编码并通过 Transformer 全局交互；Decoder 分三阶段输出——Stage 1 预测每个障碍物的决策意图（9类），Stage 2 在各决策条件下生成障碍物多模态预测轨迹（9条/障碍物），Stage 3 通过横纵向交叉注意力（含导航交叉注意力）解码自车多模态规划轨迹（N_R × N_L 条）。模型输出的决策、预测轨迹和规划轨迹作为下游多决策时空联合优化的输入。
 >
@@ -1026,47 +1026,47 @@ L_imitation = smooth_l1(model_traj, executed_traj)
 ##### ⑧ 典型场景
 路口红灯停车：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779853117880-e5d73ce7-96bb-4496-a340-b519c590eb3c.gif)
+![](assets/asset_15.png)
 
 路口绿灯通行：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779851084816-f9df905e-0cb3-44f4-8add-4c9e190ccbfb.gif)
+![](assets/asset_16.png)
 
 横穿车让行：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779853220167-35bf3560-1673-443f-b840-26e6fa8c3b62.gif)
+![](assets/asset_17.png)
 
 cut_in避让超车：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779851188045-c1ec3aae-17bb-4624-8c4d-cfcfb86c43bd.gif)
+![](assets/asset_18.png)
 
 cut_in让行：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852420274-628a8347-9b0c-4cab-ae5a-3a937723b561.gif)
+![](assets/asset_19.png)
 
 借道绕行：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852973236-86690237-fe46-4f39-897c-8e3968c9a8b4.gif)
+![](assets/asset_20.gif)
 
 导航变道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852305664-b2b6a473-70ea-4b42-89f6-13779322c74a.gif)
+![](assets/asset_21.gif)
 
 效率变道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852529583-2a9b655a-35df-438e-b6b7-7598eeff60f2.gif)
+![](assets/asset_22.gif)
 
 拨杆变道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852842600-be06a67d-cc08-45d7-8e9d-143e8297f38c.gif)
+![](assets/asset_23.gif)
 
 下匝道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779856279012-822bc8f6-35ca-4567-994f-94c248986d05.gif)
+![](assets/asset_24.gif)
 
 上匝道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779856355807-99ba996e-27d7-4145-8e72-82fc89c562a5.gif)
+![](assets/asset_25.gif)
 
 #### 2.1.2 多决策时空联合交互优化
 ##### ① 问题背景
@@ -1074,27 +1074,27 @@ cut_in让行：
 
 拨杆变道响应慢：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865031677-5f855e63-f2f3-4139-bb70-46a439fb4837.gif)
+![](assets/asset_26.gif)
 
 导航变道发起晚：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779860931098-befeddcc-6332-4bfd-857c-213f11534ad3.gif)
+![](assets/asset_27.gif)
 
 实线变道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865166724-e0bead35-2067-40cf-96d0-4541910ff718.gif)
+![](assets/asset_28.gif)
 
 变道返回碰撞风险：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865312613-045d7ffa-3a04-4ca4-82dd-30e7354c0bf3.gif)
+![](assets/asset_29.gif)
 
 cut_in碰撞风险：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865410515-1565a53d-3445-40b2-b18d-d0162956b6dc.gif)
+![](assets/asset_30.gif)
 
 两侧车碰撞风险：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865528904-854252c5-0475-4224-868f-c159d610ca46.gif)
+![](assets/asset_31.gif)
 
 ##### ② 多模态轨迹与场景构建
 模型输出自车 $ N_R \times N_L $ 条多模态轨迹（横向参考线 × 纵向模态）及每个障碍物的 9 种决策概率和预测轨迹。
@@ -1113,7 +1113,7 @@ cut_in碰撞风险：
 ###### 场景构建
 每个合理的横向模态构成一个独立场景，各场景构造参考输入及边界约束，分别进入下游 iLQR 联合优化，最终按代价最小选择最优场景执行。
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779865733352-d3a60398-cfb3-4873-82a8-dbd6e3519abb.png)
+![](assets/asset_32.gif)
 
 联合优化的输入：
 
@@ -1134,11 +1134,11 @@ cut_in碰撞风险：
 
 车道保持场景：
 
-![](https://cdn.nlark.com/yuque/0/2026/jpeg/27299753/1779696427827-b2e14b92-6a0c-45ec-83f6-6f4ffbb37feb.jpeg)
+![](assets/asset_33.gif)
 
 变道场景：
 
-![](https://cdn.nlark.com/yuque/0/2026/jpeg/27299753/1779696428212-2ef47094-806c-41f5-ab37-fde7b59ff29b.jpeg)
+![](assets/asset_34.gif)
 
 参考文献：
 
@@ -1154,7 +1154,7 @@ cut_in碰撞风险：
 
 
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779433734125-df2b2e12-dec1-4a09-8482-c8ee21372088.png)
+![](assets/asset_35.gif)
 
 使用中间时刻航向角（减少线性近似误差）：
 
@@ -1180,7 +1180,7 @@ $ a_{i+1} = a_i + j \Delta t $
 
 
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779860351162-4f1b0b03-4407-4938-81e4-d5a9651bb471.png)
+![](assets/asset_36.gif)
 
 ---
 
@@ -1624,7 +1624,7 @@ void ReferenceCostTerm::GetGradientHessian(
 
 **多圆盘模型**：
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779453466509-550ce033-184e-46bb-932a-efba8a74d1cc.png)    ![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779453465962-61e943e7-2043-4ff7-b600-4bced9e20b5d.png)   
+![](assets/asset_37.png)    ![](assets/asset_38.jpeg)   
 
 + 自车：3 个圆盘，中心沿车身纵轴分布于 $ L, 3L, 5L $（$ L = \text{length}/6 $），半径 $ r_{ego} = \sqrt{L^2 + (w/2)^2} $
 + 障碍物：动态圆盘数（基于长宽比 $ n = \min(6, \max(2, 2 \cdot l/w)) $），半径 $ r_{obs} = \sqrt{(l/(2n))^2 + (w/2)^2} $
@@ -1652,7 +1652,7 @@ $ \frac{\partial^2 J}{\partial x_i \partial x_j} = w \cdot e^{violation} \left( 
 
 
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779698294948-fe839dd8-c2cc-423a-921d-ab9faa0e5f80.png)
+![](assets/asset_39.jpeg)
 
 **代码实现：**
 
@@ -1904,7 +1904,7 @@ void EgoThreeDiscSafeCostTerm::GetGradientHessian(
 ###### 道路边界代价（RoadBoundaryCostTerm）
 **目标**：约束自车和障碍物均不超出道路边界。对自车和每个障碍物分别使用 KDPath 查询前后中心点到左右边界的最近距离。
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779698646782-e0676d03-bf71-4ca4-93c4-d5b252daada3.png)
+![](assets/asset_40.png)
 
 $ J_{boundary} = w \cdot (e^{d_{safe} - d + r_{ego}} - 1) \quad \text{when } d \lt d_{safe} + r_{ego}, \quad 0 \text{ otherwise} $
 
@@ -3112,7 +3112,7 @@ iLQR 是面向非线性确定性系统的有限时域最优控制算法，核心
 
 
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779860409607-d58faa74-dace-4772-8adb-a949c929c6db.png)
+![](assets/asset_41.png)
 
 ###### 标准定义
 离散非线性系统，被控对象满足以下状态转移方程：
@@ -3126,7 +3126,7 @@ $ x_{t+1} = f(x_t, u_t) $
 
 优化目标：找到最优控制序列 $ U^* = \{u_0^*,u_1^*,\ldots,u_{T-1}^*\} $，使有限时域内总代价最小：
 
-![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779855099422-7ba49c13-fc67-4697-91a1-d8cb592d299a.png)
+![](assets/asset_42.png)
 
 $ J(\tau) = \phi(x_T) + \sum_{t=0}^{T-1} l(x_t, u_t) $
 
@@ -3471,49 +3471,49 @@ $ f_m = 1 - \pi_0^{(i)} $
 ##### ⑦ 实车效果
 非规则路口直行：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779862159701-1f6ec8bd-efcb-47ec-8e8c-d3d384702989.gif)
+![](assets/asset_43.png)
 
 路口左转：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779863012849-431e9100-0170-49bf-a43f-30ad530a10bc.gif)大曲率弯道：
+![](assets/asset_44.png)大曲率弯道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779864352697-062afa15-279b-4a0f-a6dd-71ad0fc59822.gif)
+![](assets/asset_45.png)
 
 侧方车避让：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779863934744-ba2569e4-4991-4702-adb5-d2f5e37cb56d.gif)
+![](assets/asset_46.png)
 
 拨杆变道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779864026805-c091d145-5cd8-407e-9ddb-1c93a3b42a5d.gif)
+![](assets/asset_47.png)
 
 避让施工区域：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779862693381-5aff2e30-2f02-4316-a39e-87713cfc31c5.gif)
+![](assets/asset_48.gif)
 
 效率变道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779864195773-f20b83b8-88d8-4631-9851-eb2bb4b0bbf6.gif)
+![](assets/asset_49.gif)
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779861503261-6a80cff1-7eff-4d67-8baf-cef3bd6cbffd.gif)
+![](assets/asset_50.gif)
 
 上匝道：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779861709592-13c1ebe9-62e4-4de3-b64b-97f94d03be71.gif)
+![](assets/asset_51.gif)
 
 下匝道（有车）：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779862806650-ae734012-da3f-47ca-a135-9874049dcddd.gif)
+![](assets/asset_52.gif)
 
 下匝道（无车）：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779863110970-8be69b1e-3b86-4567-b30b-5c819cf8c9b9.gif)
+![](assets/asset_53.gif)
 
 汇入主路（无车）：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779861799930-18eee0df-0ff4-4758-b13e-558102a8b265.gif)
+![](assets/asset_54.gif)
 
 汇入主路（有车）：
 
-![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779863696977-166b61c1-5649-46f5-8f7b-d3c74fb93c6a.gif)
+![](assets/asset_55.gif)
 
