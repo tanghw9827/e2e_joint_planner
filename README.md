@@ -9,15 +9,15 @@
 + 每新增一条规则可能与已有规则冲突，系统复杂度随场景数指数增长
 + 典型场景：超长异型车
 
-![](assets/asset_01.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779531228408-a10d9a87-e8c9-4d47-9592-373b59d5f0c4.gif)
 
 + 典型场景：倒地水马
 
-![](assets/asset_02.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779531362677-d8316094-81d3-4f37-97e0-fe6d7ec41e39.gif)
 
 + 典型场景：雪地行驶，不变道
 
-![](assets/asset_03.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779532161269-df3b787b-a888-46de-87ec-683277e52851.gif)
 
 #### 1.1.2 缺乏交互建模，行为保守
 + 规则系统将他车视为"按预测轨迹运动的障碍物"，不建模自车行为对他车的影响
@@ -25,23 +25,23 @@
 + 结果：系统倾向于保守等待，效率低下，不拟人，以及无法识别意图碰撞风险
 + 典型场景：他车连续掉头，持续让行
 
-![](assets/asset_04.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779531656666-019be70c-74db-40f6-9796-bd50c1f7779e.gif)
 
 + 典型场景：自车与他车同时变道，不加速抢行
 
-![](assets/asset_05.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779532371621-726b5176-b907-447c-8543-916d1b19adda.gif)
 
 + 典型场景：进入对向车道不起步
 
-![](assets/asset_06.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779530955114-5238f7d0-f89d-4f27-be0b-a7f14cddb3b8.gif)
 
 + 典型场景：他车遮挡变道减速不足
 
-![](assets/asset_07.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1778743177779-cad83bc6-c6b0-490a-8933-37123059027c.gif)
 
 + 典型场景：鬼探头减速不足
 
-![](assets/asset_08.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779529940753-c110d1bf-f234-4bc9-adb3-cececca1032b.gif)
 
 ### 1.2 路径-速度解耦规划局限性
 **路径-速度解耦架构**（Path-Speed Decoupling），虽然工程成熟度高、计算效率可控，但存在以下核心瓶颈：
@@ -51,7 +51,7 @@
 
 **典型场景**：窄道会车
 
-![](assets/asset_09.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1778485144952-6a200747-c8df-4e2d-86d3-85b12011d246.gif)
 
 + **问题表现**：对向车侵入自车道，自车横向避让不足，急刹接管
 + **根本原因**：横向规划时未考虑纵向减速配合，解空间受限
@@ -62,7 +62,7 @@
 
 **典型场景**：汇流并道
 
-![](assets/asset_10.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1778486214368-09cab062-1d18-4bc9-9482-16bbe5270964.gif)
 
 + **问题表现**：自车向左汇流时，自车对前方车辆进行较大减速避让，汇入主路时距离后车过近造成恐慌感
 + **根本原因**：解耦决策无法根据他车意图（抢行/让行）动态调整，只能保守让行
@@ -70,7 +70,7 @@
 
 **典型场景**：路口他车近距离抢道
 
-![](assets/asset_11.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779530440419-93801096-1d62-4d3a-8848-788c560af2d1.gif)
 
 + **问题表现**：侧方车近距离抢道，持续靠左，自车横向未进行避让，纵向急刹=
 + **根本原因**：预测一旦偏差，横纵独立规划都"看不到"威胁，单维度无法独立解决
@@ -82,26 +82,24 @@
 ### 2.1 整体架构
 **数据流：**
 
-![画板](assets/asset_12.jpeg)
+![](https://cdn.nlark.com/yuque/0/2026/jpeg/27299753/1779856838290-dd417dcd-27b1-4833-84ab-c8adf7060a54.jpeg)
 
 **整体架构：**
 
-![](assets/asset_13.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779679540373-b0879ff6-3a06-4f5a-9807-024768fd8917.png)
 
 #### 2.1.1 障碍物决策导向二阶段模型
 **模型架构：**
 
-![](assets/asset_14.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1780227830709-a3ebb378-0797-47ce-99ce-e0343a46e720.png)
 
-> 模型采用 Encoder-Decoder 架构：Encoder 将场景元素（Agent 历史轨迹、地图、静态障碍物）统一编码并通过 Transformer 全局交互；Decoder 分三阶段输出——Stage 1 预测每个障碍物的决策意图（9类），Stage 2 在各决策条件下生成障碍物多模态预测轨迹（9条/障碍物），Stage 3 通过横纵向交叉注意力解码自车多模态规划轨迹（N_R × N_L 条）。模型输出的决策、预测轨迹和规划轨迹作为下游多决策时空联合优化的输入。
+> 模型采用 Encoder-Decoder 架构：Encoder 将场景元素（Agent 历史轨迹、地图、静态障碍物、红绿灯、导航信息）统一编码并通过 Transformer 全局交互；Decoder 分三阶段输出——Stage 1 预测每个障碍物的决策意图（9类），Stage 2 在各决策条件下生成障碍物多模态预测轨迹（9条/障碍物），Stage 3 通过横纵向交叉注意力（含导航交叉注意力）解码自车多模态规划轨迹（N_R × N_L 条）。模型输出的决策、预测轨迹和规划轨迹作为下游多决策时空联合优化的输入。
 >
 
 ##### ① 问题形式
 输入输出定义：
 
-**(T₀, π₀), P₁:Nₐ, I₁:Nₐ = f(A, O, M, C | φ)**
-
-_τ__ = argmax S(τ, π, P₁:Nₐ, O, M, C)_*
+**(T₀, π₀), P₁:Nₐ, I₁:Nₐ = f(A, O, M, C, N | φ)**
 
 各符号含义：
 
@@ -111,58 +109,370 @@ _τ__ = argmax S(τ, π, P₁:Nₐ, O, M, C)_*
 | O = {O₁, ..., Oₙₛ} | 静态障碍物集合 |
 | M | 地图 |
 | C | 交通信号等上下文 |
+| N | 导航信息（路线点、车道箭头、引导动作） |
 | T₀ | 自车输出的 N_R × N_L 条规划轨迹 |
 | π₀ | 每条轨迹的置信度分数 |
 | P₁:Nₐ | 障碍物预测轨迹 |
 | I₁:Nₐ | 自车对障碍物的决策意图 |
 
 
-##### ② 数据挖掘
-基于plan_debug_msg的定位时间**localization_timestamp，**找到与其最近的loc_msg，提取自车、障碍物及动图信息，通过数据清洗得到最终数据
+##### ② 数据处理
+基于plan_debug_msg的定位时间**localization_timestamp，**找到与其最近的loc_msg，提取自车、障碍物及地图及导航信息，通过数据清洗得到最终数据
 
-| 关键函数 | 功能说明 |
+**定位信息处理：**
+
+由于感知消息（10Hz）和定位消息的时间戳不完全对齐，且导航消息（1-2Hz）存在延迟，需要对自车状态做时间插值：
+
+| 处理步骤 | 功能说明 |
 | :---: | --- |
-| load_extract_data_based_localization.py | 根据plan_debug_msg的定位时间**localization_timestamp**，从原始bag中的loc_msg、fusion_object、fusion_road提取自车、障碍物、车道线及其中心线的**绝对坐标数据**。 |
-| feature_extract_for_DLP_based_localization.py | 将提取的数据按照固定格式，保存为csv文件，目前主要是三类csv文件夹：agent_data（存放自车和障碍物数据）、map_data（车道中心线数据）和data_lane_data（车道线数据）文件夹。 |
-| extract_bag_files.py | 提取指定车辆的所有bag文件，将其路径保存为json文件。 |
-| check_bag_files.py | 检测是否为有效bag。 |
+| 定位缓存 | 每次定位更新时缓存当前时刻的 pose(4x4)、vel(m/s)、acc(m/s²) 到历史队列 |
+| 时间戳对齐 | 感知消息到达时，根据其时间戳在定位历史队列中做线性插值，得到该时刻精确的自车状态 |
+| 坐标补偿 | 导航消息延迟 0.5-3s，通过 `transform = inv(当前pose) @ 导航时刻pose` 将导航坐标转到当前自车系 |
+| 历史帧补偿 | 时序输入（红绿灯/车道线）的历史帧坐标需要转到当前帧：`pts_now = inv(pose_now) @ pose_hist @ pts_hist` |
 
 
-数据处理主要包括：**时间间隔均匀化**以及**障碍物数据一致性**
+> 插值保证了所有输入数据在时间上对齐到同一时刻，坐标补偿保证了所有空间数据在坐标系上对齐到当前自车系。
+>
 
-![](assets/asset_15.png)
+**自车状态处理（process_ego_state_info）：**
 
-**时间间隔均匀化：**
+```plain
+定位模块输出: pose(4x4), vel(m/s), acc(m/s²), wheel_angle(rad)
+  → 提取当前帧自车速度标量 ego_vel
+  → 输出: ego_vel (1,) — 当前车速，作为模型的自车状态输入
+```
 
-根据plan_debug_msg的定位时间**localization_timestamp**挖掘的数据**时间间隔不均匀**，如下图所示。在模型训练之前，需要对数据进行**重采样**，使其时间均匀。
+> 模型不输入自车历史轨迹，仅输入当前帧速度标量。自车的运动历史信息通过障碍物/车道线的时序输入隐式获取（历史帧坐标已补偿到当前帧，帧间位置差异反映了自车运动）。
+>
 
-![](assets/asset_16.png)
+**障碍物处理（process_obstacle_info）：**
 
-**两帧数据相同：**
+障碍物数据处理包括**离线预处理**和**在线处理**两部分：
 
-由于**预测延迟**导致的**两帧数据相同。**
+**离线预处理（数据清洗）：**
 
-![](assets/asset_17.png)
++ **时间间隔均匀化**：原始数据时间间隔不均匀或者两帧数据相同，采用 PchipInterpolator 对障碍物位置(x,y)重采样，使时间间隔为 0.1s
++ **静止障碍物轨迹异常**：感知误差导致静止物体有微小位移。处理方法：判断障碍物属性，将静止物体轨迹优化为 0
 
-**重采样**：采用**scipy.interpolate** 的 **PchipInterpolator **对障碍物和自车位置信息（x，y坐标）重采样，使其**时间间隔为0.1s**。
+**在线处理（模型输入构造）：**
 
-输入：原始的时间帧和障碍物和自车位置信息（x，y坐标）拟合**PchipInterpolator **
+```plain
+感知输出: objs_location(N,3), objs_dims(N,3), objs_rotation_z(N,), objs_velocity_abs(N,2), objs_label(N,), objs_score(N,)
+  → 感知范围裁剪（超出 percep_range 的障碍物丢弃）
+  → 尺寸轴交换: [w,l,h] → [l,w,h]
+  → 角点计算: location + size + rotation → 8个3D角点 (N, 8, 3)
+  → 数据增强: 尺寸/角点/速度加随机噪声
+  → 按置信度降序排列，截断到 max_instance (N_A)，不够的 padding 零
+  → 输出: objs_corner_pts (N_A, 8, 3), objs_vel (N_A, 2),
+          objs_label (N_A,), objs_score (N_A,), objs_mask (N_A,)
+```
 
-输出：对原始时间帧进行均匀采样，使其间隔为0.1s，obstacle_new_timestamps = np.arange(round(obstacle_original_timestamps[0], 1), round(obstacle_original_timestamps[-1], 1) + 1e-10, 0.1)，然后输入到拟合好的**PchipInterpolator** 中，获取时间均匀采样后的位置信息（x，y坐标）
+> 障碍物为单帧输入，与 AgentEncoder 对齐。AgentEncoder 内部通过历史轨迹（T_H=20帧）的帧间差分获取运动特征。
+>
 
-**轨迹点数据跳帧、不连续突变：**
+**障碍物决策标签生成（Intent Label）：**
 
-由于间隔几帧后，感知给不同障碍物赋予了相同的id，会导致障碍物id突变，进而把两个不同的障碍物轨迹拼接在一起，如图所示。
+模型 Stage 1 需要监督信号：自车对每个障碍物的决策标签（9类 = 纵向3类 × 横向3类）。该标签基于**真实未来轨迹**离线生成。
 
-![](assets/asset_18.png)
+| 纵向决策 | 判定条件 | 物理含义 |
+| :---: | --- | --- |
+| LonIgnore (0) | 自车与障碍物无纵向交互 | 不超不让，各走各的 |
+| Overtake (1) | 自车最终在障碍物前方 | 自车超过障碍物 |
+| Yield (2) | 自车最终在障碍物后方 | 自车让障碍物先走 |
 
-数据处理方法：依据当前帧（当前帧有数据，目前模型对当前帧看不到的障碍物不预测），通过判断突变的间隔帧数是否大于5，剔除不连续帧障碍物id的跳变
 
-**感知误差导致的静止障碍物轨迹异常：**
+| 横向决策 | 判定条件 | 物理含义 |
+| :---: | --- | --- |
+| LatIgnore (0) | 自车与障碍物无横向偏移 | 不绕行 |
+| NudgeLeft (1) | 自车从障碍物左侧绕过 | 向左避让 |
+| NudgeRight (2) | 自车从障碍物右侧绕过 | 向右避让 |
 
-![](assets/asset_19.png)
 
-数据处理方法：判断障碍物属性，优化轨迹为0
+联合标签：`gt_label = lon_action * 3 + lat_action`，取值 0~8。
+
+**纵向决策标注算法：**
+
+```python
+def label_longitudinal(ego_traj, obs_traj, obs_heading):
+    """
+    ego_traj: (T, 2) 自车未来T帧位置
+    obs_traj: (T, 2) 障碍物未来T帧位置
+    obs_heading: (T,) 障碍物航向角
+    返回: 0=LonIgnore, 1=Overtake, 2=Yield
+    """
+    # 取未来轨迹终点
+    ego_end = ego_traj[-1]
+    obs_end = obs_traj[-1]
+    obs_theta = obs_heading[-1]
+
+    # 自车终点相对障碍物终点的位移
+    delta = ego_end - obs_end
+
+    # 投影到障碍物航向方向 = 纵向距离
+    longitudinal = delta[0] * np.cos(obs_theta) + delta[1] * np.sin(obs_theta)
+    # 投影到障碍物航向垂直方向 = 横向距离
+    lateral = -delta[0] * np.sin(obs_theta) + delta[1] * np.cos(obs_theta)
+
+    # 横向距离过大 -> 无纵向交互
+    if abs(lateral) > LANE_WIDTH * 1.5:  # 5.6m
+        return 0  # LonIgnore
+
+    # 纵向距离过大 -> 无纵向交互
+    if abs(longitudinal) > LON_THRESHOLD:  # 50m
+        return 0  # LonIgnore
+
+    # 判断超车/让行
+    if longitudinal > OVERTAKE_MARGIN:  # 2m
+        return 1  # Overtake
+    elif longitudinal < -YIELD_MARGIN:  # -2m
+        return 2  # Yield
+    else:
+        return 0  # LonIgnore
+```
+
+**横向决策标注算法：**
+
+```python
+def label_lateral(ego_traj, obs_traj, obs_heading):
+    """
+    判断自车是否从障碍物左侧或右侧绕过
+    返回: 0=LatIgnore, 1=NudgeLeft, 2=NudgeRight
+    """
+    # 计算每帧自车相对障碍物的横向偏移
+    lateral_offsets = []
+    for t in range(len(ego_traj)):
+        delta = ego_traj[t] - obs_traj[min(t, len(obs_traj)-1)]
+        theta = obs_heading[min(t, len(obs_heading)-1)]
+        # 正值=自车在障碍物左侧，负值=右侧
+        lat = -delta[0] * np.sin(theta) + delta[1] * np.cos(theta)
+        lateral_offsets.append(lat)
+
+    # 取轨迹中段的平均横向偏移（避免首尾噪声）
+    mid_start = len(lateral_offsets) // 4
+    mid_end = len(lateral_offsets) * 3 // 4
+    avg_lateral = np.mean(lateral_offsets[mid_start:mid_end])
+
+    # 判断障碍物是否在自车路径上（需要绕行的前提）
+    min_abs_lateral = min(abs(l) for l in lateral_offsets)
+    if min_abs_lateral > (OBS_WIDTH + EGO_WIDTH) / 2 + SAFE_MARGIN:
+        return 0  # LatIgnore，障碍物不在路径上
+
+    # 判断绕行方向
+    if avg_lateral > NUDGE_THRESHOLD:   # 1.0m
+        return 1  # NudgeLeft
+    elif avg_lateral < -NUDGE_THRESHOLD:
+        return 2  # NudgeRight
+    else:
+        return 0  # LatIgnore
+```
+
+**标注流程汇总：**
+
+```python
+def generate_intent_labels(ego_future, obs_futures, obs_headings):
+    """
+    ego_future: (T, 2) 自车GT未来轨迹
+    obs_futures: (N_A-1, T, 2) 所有障碍物GT未来轨迹
+    obs_headings: (N_A-1, T) 所有障碍物GT未来航向
+    返回: (N_A-1,) 每个障碍物的决策标签 (0~8)
+    """
+    labels = []
+    for k in range(len(obs_futures)):
+        lon = label_longitudinal(ego_future, obs_futures[k], obs_headings[k])
+        lat = label_lateral(ego_future, obs_futures[k], obs_headings[k])
+        label = lon * 3 + lat
+        labels.append(label)
+    return np.array(labels)
+```
+
+**关键参数：**
+
+| 参数 | 典型值 | 说明 |
+| :---: | :---: | --- |
+| LANE_WIDTH | 3.75m | 车道宽度 |
+| LON_THRESHOLD | 50m | 纵向交互判定距离 |
+| OVERTAKE_MARGIN | 2m | 超车判定余量 |
+| YIELD_MARGIN | 2m | 让行判定余量 |
+| NUDGE_THRESHOLD | 1.0m | 横向绕行判定阈值 |
+| SAFE_MARGIN | 0.5m | 安全余量 |
+| OBS_WIDTH | 2.0m | 障碍物典型宽度 |
+| EGO_WIDTH | 1.9m | 自车宽度 |
+
+
+**标签分布（典型）：**
+
+| 标签 | 含义 | 占比 |
+| :---: | --- | :---: |
+| 0 (Ignore+Ignore) | 无交互 | ~65% |
+| 3 (Overtake+Ignore) | 超车不绕 | ~12% |
+| 6 (Yield+Ignore) | 让行不绕 | ~15% |
+| 4 (Overtake+Left) | 超车+左绕 | ~3% |
+| 5 (Overtake+Right) | 超车+右绕 | ~2% |
+| 7 (Yield+Left) | 让行+左绕 | ~1% |
+| 其他 | 少见组合 | ~2% |
+
+
+> 注：Ignore 占比高是正常的——大部分障碍物与自车无直接交互（对向车道、远处车辆）。训练时可对少数类做 focal loss 或过采样。
+>
+
+**标签粒度与时间范围：**
+
++ 每个训练样本（当前帧 t 的场景快照），对每个障碍物生成 **1 个标签**（不是逐帧标注）
++ 该标签描述"从当前帧到未来 5 秒（50帧@10Hz），自车对该障碍物的**整体决策结果**"
++ 纵向决策：看 GT 轨迹**终点**的纵向相对位置（5秒后谁在前谁在后）
++ 横向决策：看 GT 轨迹**中段**（第12<sub>37帧，约1.2s</sub>3.7s）的平均横向偏移
+
+**未来轨迹不足5秒的处理：**
+
+部分障碍物可能中途消失（驶出感知范围、被遮挡、感知丢失），GT 轨迹不满 50 帧：
+
+```python
+def get_effective_endpoint(obs_traj, obs_heading, valid_mask):
+    """
+    获取有效终点，处理轨迹不足5秒的情况
+    obs_traj: (T, 2)
+    valid_mask: (T,) bool
+    """
+    num_valid = valid_mask.sum()
+
+    # 有效帧太少（<10帧，不到1秒）-> 无法可靠判断
+    if num_valid < MIN_VALID_FRAMES:  # MIN_VALID_FRAMES = 10
+        return None  # 标签设为 LonIgnore + LatIgnore = 0
+
+    # 取最后一个有效帧作为终点
+    last_valid_idx = np.where(valid_mask)[0][-1]
+    endpoint = obs_traj[last_valid_idx]
+    heading = obs_heading[last_valid_idx]
+
+    return endpoint, heading, last_valid_idx
+```
+
+处理规则：
+
+| 情况 | 有效帧数 | 处理方式 |
+| :---: | :---: | --- |
+| 正常 | 50帧（完整5秒） | 用第50帧终点判断纵向，用第12~37帧判断横向 |
+| 部分缺失 | 10~49帧 | 用最后有效帧作为终点判断纵向，横向取有效范围的中段 |
+| 严重缺失 | <10帧（不到1秒） | 直接标为 LonIgnore + LatIgnore（标签=0），不参与 L_intent 计算 |
+| 当前帧不可见 | 0帧 | 不预测该障碍物（不进入模型） |
+
+
+> 对于"部分缺失"的情况，纵向判断的可靠性会降低（只看了2~4秒的结果），但仍然比不标注好。横向判断受影响较小，因为绕行动作通常在前几秒就能体现。
+>
+
+**数据增强（Data Augmentation）：**
+
+训练时对输入数据施加多种随机扰动，提升模型对感知噪声和定位误差的鲁棒性：
+
+| 增强类型 | 作用对象 | 具体方式 | 参数 |
+| :---: | :---: | --- | --- |
+| 自车航向角噪声 | 全局坐标系 | 每个 episode 开始时，以概率 `noise_prob` 对自车 pose 右乘一个 yaw 旋转矩阵，所有后续帧的定位都带上这个偏移 | yaw_noise_range（度），noise_prob |
+| 感知范围随机裁剪 | 障碍物/车道线 | 每帧随机缩放感知范围的上下左右边界，模拟感知距离波动 | noise_percep_range: ((min_x_range, max_x_range), (min_y_range, max_y_range)) |
+| 障碍物尺寸噪声 | 障碍物 bbox | 长度 ±0.1m，宽度/高度 ±0.05m 均匀随机噪声 | 固定范围 |
+| 障碍物位置噪声 | 障碍物角点 | 每个角点坐标 ±0.05m 均匀随机噪声 | 固定范围 |
+| 障碍物速度噪声 | 障碍物速度 | 纵向 ±0.1m/s，横向 ±0.05m/s 均匀随机噪声 | 固定范围 |
+| 障碍物随机丢弃 | 障碍物 mask | 以概率 `obj_drop_prob` 随机将部分障碍物标记为无效（模拟感知漏检） | obj_drop_prob |
+| 车道线随机丢弃 | 车道线 mask | 以概率 `line_drop_prob` 随机将部分车道线标记为无效（模拟感知漏检） | line_drop_prob |
+| 导航距离噪声 | 路口/引导距离 | 对 crosses_lane_dist 和 guides_act_dist 加 ±enhance_scale 均匀随机偏移 | lane_dist_enhance, guide_dist_enhance |
+
+
+**自车航向角噪声的实现细节：**
+
+```python
+# 每个 episode 重置时决定是否加噪声
+if random.random() < pose_noise_cfg["noise_prob"]:
+    yaw_noise = random.uniform(yaw_noise_range[0], yaw_noise_range[1])  # 单位：度
+    pose_noise = eye(4)
+    pose_noise[:3, :3] = euler_to_rmat([0, 0, yaw_noise * pi/180])     # 绕z轴旋转
+    self.pose_noise = pose_noise
+
+# 之后每帧定位都右乘这个噪声
+ego_pose = car.pose @ self.pose_noise  # 所有输入坐标都带上这个偏移
+
+# 提取GT标签时需要反向补偿
+ego_correct_pose = ego_pose @ inv(self.pose_noise)  # 去掉噪声得到真实pose
+```
+
+> 航向角噪声是 episode 级别的（整个序列共享同一个偏移），而非帧级别。这模拟的是"定位系统有固定偏差"的场景，迫使模型不过度依赖绝对航向，而是从相对运动和环境线索中推断方向。
+>
+
+**车道线处理（process_lane_info）— 时序输入：**
+
+```plain
+感知输出: pts(N,20,2), pts_xushi(N,19), pts_yanse(N,19), labels(N,), scores(N,)
+  → 感知范围裁剪
+  → 属性修正: 路沿(label=1)虚实/颜色清零，护栏(label=2)虚实设1/颜色清零
+  → 按置信度降序排列，截断到 max_instance (N_L)，不够的 padding 零
+  → 缓存到历史队列
+  → 时序打包（pack_temporal_info, hist_ts 帧历史）:
+      对每个历史帧:
+        ① 坐标补偿: rela_pose 变换 20 个采样点到当前帧
+        ② 随机丢弃: 以 line_drop_prob 概率 mask 掉部分车道线
+        ③ 计算时间差: lanes_time = now_time - frame_time
+  → 输出: lanes_pts (n_frame, N_L, 20, 2), lanes_pts_xushi (n_frame, N_L, 19),
+          lanes_pts_yanse (n_frame, N_L, 19), lanes_score (n_frame, N_L),
+          lanes_label (n_frame, N_L), lanes_time (n_frame,), lanes_mask (n_frame, N_L)
+```
+
+> 车道线为时序输入，与 LaneEncoder（时序编码）对齐。多帧叠加 + time_embedding 使模型对感知闪烁更鲁棒。
+>
+
+**时序打包机制（pack_temporal_info）：**
+
+车道线和红绿灯的时序输入共用同一套队列管理逻辑：
+
+```plain
+输入: 当前帧数据, 历史队列, 需要的历史帧数 hist_ts
+流程:
+  1. 当前帧 append 到队列，超过 hist_ts+1 就 pop 最老的
+  2. 从队列尾部（最新）往前取 hist_ts+1 帧
+  3. 每帧调用 compensate_func:
+     - 坐标变换到当前帧（inv(now_pose) @ frame_pose）
+     - 随机丢弃（数据增强）
+     - 计算时间差
+  4. 不够的帧用 create_empty_frame_func 填充（全零 + mask=True）
+  5. 所有帧 np.stack 成固定 shape 数组
+输出: dict of numpy arrays, 第一维是时间维度
+```
+
+> 关键设计：即使当前帧是 extract_only（不推理），时序相关函数仍然执行缓存操作。这保证了当有效帧到来时，历史队列已经填满，不会出现冷启动问题。
+>
+
+**红绿灯处理（process_tsr_info）：**
+
+```plain
+感知输出: attr(3,) [左转灯状态, 直行灯状态, 右转灯状态], light_lsr(图像检测框)
+  → 距离估算: 通过前视相机中灯的像素大小反推物理距离，上限200m
+  → 距离过滤: >150m 时灯状态清零（太远不可靠）
+  → 缓存到历史队列（tsr_hist_num 帧）
+  → 倒序填充固定数组:
+      从最新帧往回填，不够的保持零 + mask=True
+  → 距离归一化: dist / 75（映射到 0~2 范围）
+  → 输出: attr (tsr_hist_num, 3), dist (tsr_hist_num,), mask (tsr_hist_num,)
+```
+
+> 红绿灯为时序输入，与 TSREncoder 对齐。多帧历史状态使模型能感知信号灯变化趋势（如即将变绿）。
+>
+
+**导航数据提取与处理：**
+
+除自车/障碍物/车道线数据外，还需提取高德导航信息（amap_navi），为模型提供全局路线引导。导航数据的处理流程：
+
+| 处理步骤 | 功能说明 |
+| :---: | --- |
+| 导航消息定位 | 根据当前帧时间戳，通过二分查找找到最近的导航消息帧（容忍延迟：低速<6s，高速<3s） |
+| 坐标变换 | 将导航路线点从经纬度(LLA)转换到当前自车坐标系(ego frame)：LLA→ENU→旋转对齐→时间补偿 |
+| 里程坐标构建 | 遍历所有link累加长度构建s坐标系，定位自车在路线上的里程位置 |
+| 路线切分 | 在自车投影点处将路线切分为历史段和未来段，取未来段作为导航路径 |
+| 车道信息提取 | 提取前方路口的车道转向箭头（back_lanes/front_lanes/extend_lanes）及路口距离 |
+| 引导信息提取 | 提取导航转向指令（maneuver_id：左转/右转/直行/掉头等）及执行距离 |
+
+
+时序输入（车道线、红绿灯）的优势：
+
++ 感知闪烁鲁棒：车道线单帧漏检不影响，历史帧提供补充
++ 信号灯趋势感知：多帧红绿灯状态序列使模型能预判信号变化
++ 遮挡恢复：被遮挡的车道线在历史帧中可能可见
 
 ##### ③ 编码器（Encoder）
 编码器将场景中所有元素统一编码为 D=128 维特征向量，再通过 Transformer 全局交互。
@@ -171,11 +481,11 @@ _τ__ = argmax S(τ, π, P₁:Nₐ, O, M, C)_*
 
 | 全局坐标系特征 | 大小（N表示障碍物数量，T表示时间步数） |
 | :---: | :---: |
-| position  | np.zeros((N, T, 2), dtype=np.float64) |
-| heading  | np.zeros((N, T), dtype=np.float64) |
-| velocity  | np.zeros((N, T, 2), dtype=np.float64) |
-| shape  | np.zeros((N, T, 2), dtype=np.float64) |
-| valid_mask  | np.zeros((N, T), dtype=np.bool) |
+| position | np.zeros((N, T, 2), dtype=np.float64) |
+| heading | np.zeros((N, T), dtype=np.float64) |
+| velocity | np.zeros((N, T, 2), dtype=np.float64) |
+| shape | np.zeros((N, T, 2), dtype=np.float64) |
+| valid_mask | np.zeros((N, T), dtype=np.bool) |
 
 
 非自回归 (Non-Autoregressive)：一次输入一组数据，一次输出一组预测数据
@@ -211,9 +521,18 @@ agent_feature = torch.cat([
   → 输出 E_A: (bs, N_A, D=128)
 ```
 
-**地图编码（MapEncoder）**
+**地图编码（MapEncoder）— 时序编码**
 
-每条车道多边形取20个采样点，构造10维特征：
+| 地图特征 | 大小（N_P 表示车道多边形数量） |
+| :---: | :---: |
+| point_position | (N_P, 20, 3, 2) |
+| point_vector | (N_P, 20, 2) |
+| point_orientation | (N_P, 20) |
+| polygon_center | (N_P, 2) |
+| valid_mask | (N_P,) |
+
+
+每条车道多边形取 20 个采样点，构造 10 维特征：
 
 ```python
 polygon_feature = torch.cat([
@@ -226,16 +545,44 @@ polygon_feature = torch.cat([
 ], dim=-1)  # → (bs, N_P, 20, 10)
 ```
 
-编码流程：
+**时间嵌入（time_emb）实现：**
+
+`lanes_time` 是每帧相对当前帧的时间差（单位：秒），例如 `[-0.3, -0.2, -0.1, 0.0]` 表示 4 帧历史。
+
+```python
+# 1. 正弦位置编码：将标量时间差映射到 D 维向量
+#    pos2posemb1d: 用不同频率的 sin/cos 生成位置编码
+#    输入: lanes_time (bs, n_frame, 1)
+#    输出: (bs, n_frame, D)
+time_pos = pos2posemb1d(lanes_time[..., None], num_pos_feats=D)
+
+# 2. 线性投影 + LayerNorm：将正弦编码映射到特征空间
+#    time_embedding = nn.Sequential(Linear(D, D), LayerNorm(D))
+time_emb = time_embedding(time_pos)  # (bs, n_frame, D)
+
+# 3. 广播加到每条车道线上：同一帧内所有车道线共享同一个时间嵌入
+lanes_feat = lanes_feat + time_emb[:, :, None, :]
+# time_emb[:, :, None, :] shape: (bs, n_frame, 1, D) → 广播到 (bs, n_frame, N_P, D)
+```
+
+> 正弦位置编码的原理：用不同频率的 sin/cos 函数将连续时间值映射到高维空间，使模型能区分不同时刻。频率从低到高覆盖，低频捕捉粗粒度时间关系，高频捕捉细粒度时间差异。经过 Linear+LayerNorm 后投影到与其他特征相同的语义空间。
+>
+
+编码流程（时序）：
 
 ```plain
-(bs, N_P, 20, 10)
-  → reshape: (bs*N_P, 20, 10)
-  → PointsEncoder 两层 max-pool: → (bs*N_P, 128)
-  → reshape: (bs, N_P, 128)
+(bs, n_frame, N_P, 20, 10)
+  → reshape: (bs*n_frame*N_P, 20, 10)
+  → PointsEncoder 两层 max-pool: → (bs*n_frame*N_P, 128)
+  → reshape: (bs, n_frame, N_P, 128)
   → + type_emb + on_route_emb + tl_emb + speed_limit_emb
-  → 输出 E_P: (bs, N_P, D=128)
+  → + time_emb（正弦位置编码 → Linear → LayerNorm → 广播到每条车道线）
+  → reshape: (bs, n_frame*N_P, 128)
+  → 输出 E_P: (bs, N_M, D=128)  其中 N_M = n_frame * N_P
 ```
+
+> 地图编码在原有单帧特征（点坐标、方向、边界偏移）基础上增加了时序维度：多帧地图感知结果叠加输入，通过时间嵌入区分不同时刻，使模型能感知地图元素的时序一致性。
+>
 
 **静态障碍物编码（StaticObjectsEncoder）**
 
@@ -245,16 +592,115 @@ x = x + category_embedding(category)  # + 类型嵌入
 # 输出 E_O: (bs, N_S, D=128)
 ```
 
+**红绿灯编码（TSREncoder）**
+
+| 红绿灯特征 | 大小（tsr_hist_num 表示历史帧数） |
+| :---: | :---: |
+| attr | np.zeros((tsr_hist_num, 3), dtype=np.int64) |
+| dist | np.zeros((tsr_hist_num,), dtype=np.float32) |
+| mask | np.ones((tsr_hist_num,), dtype=np.bool) |
+
+
+其中 `attr` 的 3 维分别对应左转灯、直行灯、右转灯的状态类别（num_attr_classes 种），`dist` 为红绿灯距离（归一化到 /75m），`mask` 标记哪些历史帧有效。
+
+```python
+# 输入: attr (bs, tsr_hist_num, 3), dist (bs, tsr_hist_num), mask (bs, tsr_hist_num)
+
+left_embed = attr_embedding(attr[..., 0]) + left_embedding    # 左转灯状态嵌入
+straight_embed = attr_embedding(attr[..., 1]) + straight_embedding  # 直行灯状态嵌入
+right_embed = attr_embedding(attr[..., 2]) + right_embedding  # 右转灯状态嵌入
+dist_embed = dist_MLP(dist[..., None])                         # 距离嵌入
+time_embed = time_embedding                                    # 时序位置嵌入
+
+tsr_feat = MLP(concat([left_embed, straight_embed, right_embed, time_embed, dist_embed]))
+# → (bs, tsr_hist_num, D=128)
+```
+
+编码流程：
+
+```plain
+attr (bs, tsr_hist_num, 3) + dist (bs, tsr_hist_num)
+  → 3个方向灯状态Embedding + 距离MLP + 时序Embedding
+  → concat 5路特征 → MLP
+  → (bs, tsr_hist_num, D=128)
+  → 输出 E_TSR: (bs, tsr_hist_num, D=128)
+```
+
+> TSR 编码器将红绿灯的历史状态序列编码为特征向量，使模型能感知信号灯变化趋势（如即将变绿），结合距离信息判断是否需要减速停车。
+>
+
+**导航信息编码（NavigationEncoder）**
+
+| 导航特征 | 大小 |
+| :---: | :---: |
+| fut_nav_pts | np.zeros((n_fut_step, 4), dtype=np.float32) |
+| fut_nav_pts_road_class | np.zeros((n_fut_step,), dtype=np.int64) |
+| fut_nav_pts_mask | np.zeros((n_fut_step,), dtype=np.float32) |
+| crosses_lanes_back_act | np.full((max_n_cross, max_n_lane), 255, dtype=np.int64) |
+| crosses_lanes_front_act | np.full((max_n_cross, max_n_lane), 255, dtype=np.int64) |
+| crosses_lanes_extend_act | np.full((max_n_cross, max_n_lane), 255, dtype=np.int64) |
+| crosses_lanes_mask | np.zeros((max_n_cross, max_n_lane), dtype=np.float32) |
+| crosses_lane_dist | np.zeros((max_n_cross,), dtype=np.float32) |
+| crosses_num_lane | np.zeros((max_n_cross,), dtype=np.int64) |
+| guides_act | np.full((max_n_guide,), 255, dtype=np.int64) |
+| guides_act_mask | np.zeros((max_n_guide,), dtype=np.float32) |
+| guides_act_dist | np.zeros((max_n_guide,), dtype=np.float32) |
+
+
+导航信息包含三类语义不同的子信息，分别编码后融合：
+
+```python
+# 1. 路线点编码：fut_nav_pts (bs, n_fut_step, 4) → 空间路径特征
+nav_route_feature = NAT_FPN(fut_nav_pts * fut_nav_pts_mask)  # → (bs, D=128)
+
+# 2. 车道信息编码：crosses_lanes (bs, max_n_cross, max_n_lane) → 路口拓扑特征
+lane_feature = torch.cat([
+    crosses_lanes_back_act_embed,    # 车道动作嵌入 — D维
+    crosses_lanes_extend_act_embed,  # 延伸方向嵌入 — D维
+    crosses_lane_dist_embed,         # 距离傅里叶嵌入 — D维
+], dim=-1)  # → (bs, max_n_cross, 3D)
+lane_feature = LaneMLPEncoder(lane_feature, crosses_lanes_mask)  # → (bs, max_n_cross, D)
+
+# 3. 引导动作编码：guides_act (bs, max_n_guide) → 决策级语义特征
+guide_feature = torch.cat([
+    guides_act_embed,       # 动作类型嵌入 — D维
+    guides_dist_embed,      # 距离傅里叶嵌入 — D维
+], dim=-1)  # → (bs, max_n_guide, 2D)
+guide_feature = GuideMLPEncoder(guide_feature, guides_act_mask)  # → (bs, max_n_guide, D)
+```
+
+编码流程：
+
+```plain
+fut_nav_pts (bs, n_fut_step, 4)
+  → mask处理 + NAT-FPN时序编码
+  → (bs, 1, D=128)  [路线全局特征]
+
+crosses_lanes (bs, max_n_cross, max_n_lane)
+  → 动作Embedding + 距离FourierEmb + MLP
+  → (bs, max_n_cross, D=128)  [每个路口一个token]
+
+guides_act (bs, max_n_guide)
+  → 动作Embedding + 距离FourierEmb + MLP
+  → (bs, max_n_guide, D=128)  [每个引导一个token]
+
+合并: E_N = concat([route_token, lane_tokens, guide_tokens])
+     → (bs, 1+max_n_cross+max_n_guide, D=128)
+```
+
+> 导航编码器输出 E_N 参与 Transformer Encoder 的全局自注意力，使场景中所有元素都能感知导航意图。路线点提供几何引导（往哪弯），车道信息提供拓扑约束（哪条道能转），引导动作提供决策语义（应该做什么）。三者互补，缺一不可。
+>
+
 **自车状态编码**
 
 | 全局坐标系特征 | 大小（T表示时间步数） |
 | :---: | --- |
-| position  | np.zeros((T, 2), dtype=np.float64) |
-| heading  |  np.zeros((T), dtype=np.float64) |
-| velocity  | np.zeros((T, 2), dtype=np.float64) |
-| acceleration  | np.zeros((T, 2), dtype=np.float64) |
-| shape  | np.zeros((T, 2), dtype=np.float64) |
-| valid_mask  | np.ones(T, dtype=np.bool) |
+| position | np.zeros((T, 2), dtype=np.float64) |
+| heading | np.zeros((T), dtype=np.float64) |
+| velocity | np.zeros((T, 2), dtype=np.float64) |
+| acceleration | np.zeros((T, 2), dtype=np.float64) |
+| shape | np.zeros((T, 2), dtype=np.float64) |
+| valid_mask | np.ones(T, dtype=np.bool) |
 
 
 ```python
@@ -269,7 +715,7 @@ E_AV = StateAttentionEncoder(ego_state)  # → (bs, 1, D=128)
 
 ```python
 # 拼接所有编码器输出
-x = concat([E_A, E_P, E_O], dim=1)       # (bs, N_A+N_P+N_S, 128)
+x = concat([E_A, E_P, E_O, E_TSR, E_N], dim=1)  # (bs, N_A+N_P+N_S+N_TSR+N_N, 128)
 x = x + FourierEmbedding(pos)            # 加入位置编码 PE
 
 # 4层全局自注意力
@@ -280,7 +726,7 @@ x = LayerNorm(x)
 # 输出 E_enc: (bs, N_A+N_P+N_S, D=128)
 ```
 
-经过4层全局自注意力后，每个 token 已融合场景中所有其他元素的信息。
+经过4层全局自注意力后，每个 token 已融合场景中所有其他元素的信息（包括导航路线、车道拓扑和引导动作）。
 
 ##### ④ 解码器（Decoder）
 E_enc 的结构：
@@ -346,8 +792,8 @@ prediction = concat([loc, yaw, vel], dim=-1)      # (bs, N_A-1, T_F, 6)
 **Query 构造**：
 
 ```python
-# 横向查询 Q_lat：参考线编码
-r_emb = PointsEncoder(r_feature) + FourierEmb(r_pos)  # (bs, N_R, D)
+# 横向查询 Q_lat：从 E_enc 中提取参考线特征
+r_emb = E_enc[:, ref_line_indices]                      # (bs, N_R, D)
 r_emb = r_emb.unsqueeze(2).repeat(1, 1, N_L, 1)       # (bs, N_R, N_L, D)
 
 # 纵向查询 Q_lon：可学习模态嵌入
@@ -359,7 +805,7 @@ q = Linear(concat([r_emb, m_emb], dim=-1))             # (bs, N_R, N_L, D)
 
 **DecoderLayer × L_dec=4 层**：
 
-每层包含5个步骤：
+每层包含6个步骤：
 
 ```python
 # tgt: (bs, N_R, N_L, D)
@@ -385,7 +831,12 @@ tgt = tgt + cross_attn(query=tgt, key=E_enc, value=E_enc)[0]
 #    Query关注哪些障碍物的决策意图
 tgt = tgt + intent_cross_attn(query=tgt, key=intent_embed, value=intent_embed)[0]
 
-# ⑤ FFN
+# ⑤ 导航交叉注意力（Navigation CrossAttn）
+#    Query关注导航信息，获取全局路线引导
+#    语义："当前规划轨迹是否符合导航意图（变道/转弯/匝道）？"
+tgt = tgt + nav_cross_attn(query=tgt, key=E_N, value=E_N, key_padding_mask=nav_mask)[0]
+
+# ⑥ FFN
 tgt = tgt + FFN(LayerNorm(tgt))
 ```
 
@@ -516,6 +967,22 @@ L_intent = cross_entropy(intent_logits.view(-1, 9), gt_intent_label.view(-1))
 
 **阶段2**：
 
+采用**闭环训练**：将GT真值轨迹作为参考轨迹，基于自车当前位置经过横纵向联合规划及控制器执行后，用执行后的轨迹与模型输出轨迹计算偏差。
+
+闭环监督信号生成流程：
+
+```plain
+GT真值轨迹（人类驾驶记录）
+    ↓ 作为参考轨迹输入
+横纵向联合规划
+    ↓ 满足动力学约束 + 舒适性约束
+控制器模拟执行（自行车运动学模型）
+    ↓
+executed_traj（实际可执行轨迹）
+    ↓
+L_imitation = smooth_l1(model_traj, executed_traj)
+```
+
 + 解冻 PlanningDecoder，Gumbel-Softmax 建立可微连接
 + intent_embed 同时注入 AgentPredictor 和 PlanningDecoder 的 Intent CrossAttn
 + 梯度路径：L_imitation → DecoderLayer → intent_cross_attn → intent_embed → Gumbel-Softmax → IntentionDecoder
@@ -528,6 +995,26 @@ L_intent = cross_entropy(intent_logits.view(-1, 9), gt_intent_label.view(-1))
 1. **imitation-loss驱动决策修正**：如果某个决策导致规划轨迹质量差（L_imitation 大），梯度会反向传播到 IntentionDecoder，修正决策概率分布，使模型倾向于选择对规划更友好的决策
 2. **intent_embed保证行为一致**：intent_embed 同时影响 AgentPredictor（障碍物怎么走）和 PlanningDecoder（自车怎么规划），确保"对障碍物的决策假设"和"自车的规划响应"在同一决策语义下保持一致
 
+**闭环训练策略（Closed-loop Training）：**
+
+```plain
+每个训练样本的监督信号生成：
+
+1. 取 GT 真值轨迹作为参考轨迹（reference trajectory）
+2. 以自车当前状态为初始条件
+3. 经过横纵向联合规划：
+   - 输入：当前状态 + GT参考轨迹 + 道路约束
+   - 优化目标：跟踪参考轨迹 + 满足动力学约束 + 舒适性
+   - 输出：优化后的可执行轨迹
+4. 经过控制器模拟执行：
+   - 输入：优化后轨迹
+   - 模拟：按照车辆运动学模型逐步执行
+   - 输出：实际执行轨迹（executed_traj）
+5. 用 executed_traj 作为模型的监督信号
+
+L_imitation = smooth_l1(model_traj, executed_traj)
+```
+
 参考文献：
 
 + [1] PLUTO: Push the Limit of Imitation Learning-based Planning for Autonomous Driving [https://arxiv.org/abs/2404.14327](https://arxiv.org/abs/2404.14327)
@@ -539,47 +1026,47 @@ L_intent = cross_entropy(intent_logits.view(-1, 9), gt_intent_label.view(-1))
 ##### ⑧ 典型场景
 路口红灯停车：
 
-![](assets/asset_20.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779853117880-e5d73ce7-96bb-4496-a340-b519c590eb3c.gif)
 
 路口绿灯通行：
 
-![](assets/asset_21.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779851084816-f9df905e-0cb3-44f4-8add-4c9e190ccbfb.gif)
 
 横穿车让行：
 
-![](assets/asset_22.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779853220167-35bf3560-1673-443f-b840-26e6fa8c3b62.gif)
 
 cut_in避让超车：
 
-![](assets/asset_23.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779851188045-c1ec3aae-17bb-4624-8c4d-cfcfb86c43bd.gif)
 
 cut_in让行：
 
-![](assets/asset_24.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852420274-628a8347-9b0c-4cab-ae5a-3a937723b561.gif)
 
 借道绕行：
 
-![](assets/asset_25.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852973236-86690237-fe46-4f39-897c-8e3968c9a8b4.gif)
 
 导航变道：
 
-![](assets/asset_26.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852305664-b2b6a473-70ea-4b42-89f6-13779322c74a.gif)
 
 效率变道：
 
-![](assets/asset_27.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852529583-2a9b655a-35df-438e-b6b7-7598eeff60f2.gif)
 
 拨杆变道：
 
-![](assets/asset_28.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779852842600-be06a67d-cc08-45d7-8e9d-143e8297f38c.gif)
 
 下匝道：
 
-![](assets/asset_29.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779856279012-822bc8f6-35ca-4567-994f-94c248986d05.gif)
 
 上匝道：
 
-![](assets/asset_30.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779856355807-99ba996e-27d7-4145-8e72-82fc89c562a5.gif)
 
 #### 2.1.2 多决策时空联合交互优化
 ##### ① 问题背景
@@ -587,27 +1074,27 @@ cut_in让行：
 
 拨杆变道响应慢：
 
-![](assets/asset_31.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865031677-5f855e63-f2f3-4139-bb70-46a439fb4837.gif)
 
 导航变道发起晚：
 
-![](assets/asset_32.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779860931098-befeddcc-6332-4bfd-857c-213f11534ad3.gif)
 
 实线变道：
 
-![](assets/asset_33.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865166724-e0bead35-2067-40cf-96d0-4541910ff718.gif)
 
 变道返回碰撞风险：
 
-![](assets/asset_34.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865312613-045d7ffa-3a04-4ca4-82dd-30e7354c0bf3.gif)
 
 cut_in碰撞风险：
 
-![](assets/asset_35.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865410515-1565a53d-3445-40b2-b18d-d0162956b6dc.gif)
 
 两侧车碰撞风险：
 
-![](assets/asset_36.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779865528904-854252c5-0475-4224-868f-c159d610ca46.gif)
 
 ##### ② 多模态轨迹与场景构建
 模型输出自车 $ N_R \times N_L $ 条多模态轨迹（横向参考线 × 纵向模态）及每个障碍物的 9 种决策概率和预测轨迹。
@@ -626,7 +1113,7 @@ cut_in碰撞风险：
 ###### 场景构建
 每个合理的横向模态构成一个独立场景，各场景构造参考输入及边界约束，分别进入下游 iLQR 联合优化，最终按代价最小选择最优场景执行。
 
-![](assets/asset_37.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779865733352-d3a60398-cfb3-4873-82a8-dbd6e3519abb.png)
 
 联合优化的输入：
 
@@ -647,11 +1134,11 @@ cut_in碰撞风险：
 
 车道保持场景：
 
-![](assets/asset_38.jpeg)
+![](https://cdn.nlark.com/yuque/0/2026/jpeg/27299753/1779696427827-b2e14b92-6a0c-45ec-83f6-6f4ffbb37feb.jpeg)
 
 变道场景：
 
-![](assets/asset_39.jpeg)
+![](https://cdn.nlark.com/yuque/0/2026/jpeg/27299753/1779696428212-2ef47094-806c-41f5-ab37-fde7b59ff29b.jpeg)
 
 参考文献：
 
@@ -667,7 +1154,7 @@ cut_in碰撞风险：
 
 
 
-![](assets/asset_40.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779433734125-df2b2e12-dec1-4a09-8482-c8ee21372088.png)
 
 使用中间时刻航向角（减少线性近似误差）：
 
@@ -693,7 +1180,7 @@ $ a_{i+1} = a_i + j \Delta t $
 
 
 
-![](assets/asset_41.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779860351162-4f1b0b03-4407-4938-81e4-d5a9651bb471.png)
 
 ---
 
@@ -798,7 +1285,7 @@ $ A = \begin{bmatrix} A_{ego} &0_{6\times6} \\ 0_{6\times6} & A_{obs} \end{bmatr
 
 其中自车块 $ A_{ego} \in \mathbb{R}^{6 \times 6} $：
 
-$ A_{ego} = \begin{bmatrix} 1 & 0 & -ds\sin\theta_{mid} & -ds\sin\theta_{mid} \cdot k_{vt} &\Delta t\cos\theta_{mid} - \Delta t v k_{\delta t}\sin\theta_{mid} & \frac{1}{2}\Delta t^2\cos\theta_{mid} \\ 0 & 1 &ds\cos\theta_{mid} &ds\cos\theta_{mid} \cdot k_{vt} &\Delta t\sin\theta_{mid} + \Delta t v k_{\delta t}\cos\theta_{mid} & \frac{1}{2}\Delta t^2\sin\theta_{mid} \\ 0 & 0 & 1 & Kv\Delta t &K\delta\Delta t & 0 \\ 0 & 0 & 0 & 1 & 0 &0 \\ 0 & 0 & 0 & 0 & 1 & \Delta t \\ 0 & 0 & 0 & 0 & 0 & 1 \end{bmatrix} $
+$ A_{ego} = \begin{bmatrix} 1 & 0 & -ds\sin\theta_{mid} & -ds\sin\theta_{mid} \cdot k_{vt} &\Delta t\cos\theta_{mid} - \Delta t v k_{\delta t}\sin\theta_{mid} &\frac{1}{2}\Delta t^2\cos\theta_{mid} \\ 0 & 1 &ds\cos\theta_{mid} &ds\cos\theta_{mid} \cdot k_{vt} &\Delta t\sin\theta_{mid} + \Delta t v k_{\delta t}\cos\theta_{mid} & \frac{1}{2}\Delta t^2\sin\theta_{mid} \\ 0 & 0 & 1 & Kv\Delta t &K\delta\Delta t & 0 \\ 0 & 0 & 0 & 1 & 0 &0 \\ 0 & 0 & 0 & 0 & 1 & \Delta t \\ 0 & 0 & 0 & 0 & 0 & 1 \end{bmatrix} $
 
 他车块 $ A_{obs} \in \mathbb{R}^{6 \times 6} $ 结构完全相同，仅将自车变量替换为对应他车变量：
 
@@ -1137,7 +1624,7 @@ void ReferenceCostTerm::GetGradientHessian(
 
 **多圆盘模型**：
 
-![](assets/asset_42.png)    ![](assets/asset_43.png)   
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779453466509-550ce033-184e-46bb-932a-efba8a74d1cc.png)    ![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779453465962-61e943e7-2043-4ff7-b600-4bced9e20b5d.png)   
 
 + 自车：3 个圆盘，中心沿车身纵轴分布于 $ L, 3L, 5L $（$ L = \text{length}/6 $），半径 $ r_{ego} = \sqrt{L^2 + (w/2)^2} $
 + 障碍物：动态圆盘数（基于长宽比 $ n = \min(6, \max(2, 2 \cdot l/w)) $），半径 $ r_{obs} = \sqrt{(l/(2n))^2 + (w/2)^2} $
@@ -1165,7 +1652,7 @@ $ \frac{\partial^2 J}{\partial x_i \partial x_j} = w \cdot e^{violation} \left( 
 
 
 
-![](assets/asset_44.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779698294948-fe839dd8-c2cc-423a-921d-ab9faa0e5f80.png)
 
 **代码实现：**
 
@@ -1417,7 +1904,7 @@ void EgoThreeDiscSafeCostTerm::GetGradientHessian(
 ###### 道路边界代价（RoadBoundaryCostTerm）
 **目标**：约束自车和障碍物均不超出道路边界。对自车和每个障碍物分别使用 KDPath 查询前后中心点到左右边界的最近距离。
 
-![](assets/asset_45.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779698646782-e0676d03-bf71-4ca4-93c4-d5b252daada3.png)
 
 $ J_{boundary} = w \cdot (e^{d_{safe} - d + r_{ego}} - 1) \quad \text{when } d \lt d_{safe} + r_{ego}, \quad 0 \text{ otherwise} $
 
@@ -2625,7 +3112,7 @@ iLQR 是面向非线性确定性系统的有限时域最优控制算法，核心
 
 
 
-![](assets/asset_46.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779860409607-d58faa74-dace-4772-8adb-a949c929c6db.png)
 
 ###### 标准定义
 离散非线性系统，被控对象满足以下状态转移方程：
@@ -2639,7 +3126,7 @@ $ x_{t+1} = f(x_t, u_t) $
 
 优化目标：找到最优控制序列 $ U^* = \{u_0^*,u_1^*,\ldots,u_{T-1}^*\} $，使有限时域内总代价最小：
 
-![](assets/asset_47.png)
+![](https://cdn.nlark.com/yuque/0/2026/png/27299753/1779855099422-7ba49c13-fc67-4697-91a1-d8cb592d299a.png)
 
 $ J(\tau) = \phi(x_T) + \sum_{t=0}^{T-1} l(x_t, u_t) $
 
@@ -2833,9 +3320,9 @@ bool iLqr::ForwardPass(double &new_cost, double &expected, const size_t &iter) {
 
 **步骤5：收敛判断**
 
-+ 正常收敛：代价下降 $ \Delta J < \epsilon_{cost} $
-+ 控制量收敛：$ \|du\| < \epsilon_{du} $
-+ 正则化溢出：$ \lambda > \lambda_{max} $（线搜索失败）
++ 正常收敛：代价下降 $ \Delta J &lt; \epsilon_{cost} $
++ 控制量收敛：$ \|du\| &lt; \epsilon_{du} $
++ 正则化溢出：$ \lambda &gt; \lambda_{max} $（线搜索失败）
 
 正则化参数 $ \lambda $ 管理策略：
 
@@ -2984,49 +3471,49 @@ $ f_m = 1 - \pi_0^{(i)} $
 ##### ⑦ 实车效果
 非规则路口直行：
 
-![](assets/asset_48.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779862159701-1f6ec8bd-efcb-47ec-8e8c-d3d384702989.gif)
 
 路口左转：
 
-![](assets/asset_49.gif)大曲率弯道：
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779863012849-431e9100-0170-49bf-a43f-30ad530a10bc.gif)大曲率弯道：
 
-![](assets/asset_50.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779864352697-062afa15-279b-4a0f-a6dd-71ad0fc59822.gif)
 
 侧方车避让：
 
-![](assets/asset_51.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779863934744-ba2569e4-4991-4702-adb5-d2f5e37cb56d.gif)
 
 拨杆变道：
 
-![](assets/asset_52.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779864026805-c091d145-5cd8-407e-9ddb-1c93a3b42a5d.gif)
 
 避让施工区域：
 
-![](assets/asset_53.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779862693381-5aff2e30-2f02-4316-a39e-87713cfc31c5.gif)
 
 效率变道：
 
-![](assets/asset_54.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779864195773-f20b83b8-88d8-4631-9851-eb2bb4b0bbf6.gif)
 
-![](assets/asset_55.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779861503261-6a80cff1-7eff-4d67-8baf-cef3bd6cbffd.gif)
 
 上匝道：
 
-![](assets/asset_56.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779861709592-13c1ebe9-62e4-4de3-b64b-97f94d03be71.gif)
 
 下匝道（有车）：
 
-![](assets/asset_57.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779862806650-ae734012-da3f-47ca-a135-9874049dcddd.gif)
 
 下匝道（无车）：
 
-![](assets/asset_58.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779863110970-8be69b1e-3b86-4567-b30b-5c819cf8c9b9.gif)
 
 汇入主路（无车）：
 
-![](assets/asset_59.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779861799930-18eee0df-0ff4-4758-b13e-558102a8b265.gif)
 
 汇入主路（有车）：
 
-![](assets/asset_60.gif)
+![](https://cdn.nlark.com/yuque/0/2026/gif/27299753/1779863696977-166b61c1-5649-46f5-8f7b-d3c74fb93c6a.gif)
 
