@@ -88,12 +88,12 @@
 
 ![](assets/asset_13.png)
 
-#### 2.1.1 障碍物决策导向二阶段模型
+#### 2.1.1 障碍物决策导向两阶段模型
 **模型架构：**
 
 ![](assets/asset_14.png)
 
-> 模型采用 Encoder-Decoder 架构：Encoder 将场景元素（Agent 历史轨迹、地图、静态障碍物、红绿灯、导航信息）统一编码并通过 Transformer 全局交互；Decoder 分三阶段输出——Stage 1 预测每个障碍物的决策意图（9类），Stage 2 在各决策条件下生成障碍物多模态预测轨迹（9条/障碍物），Stage 3 通过横纵向交叉注意力（含导航交叉注意力）解码自车多模态规划轨迹（N_R × N_L 条）。模型输出的决策、预测轨迹和规划轨迹作为下游多决策时空联合优化的输入。
+> 模型采用 Encoder-Decoder 架构：Encoder 将场景元素（Agent 历史轨迹、地图、静态障碍物、红绿灯、导航信息）统一编码并通过 Transformer 全局交互；Decoder 分三阶段输出——Stage 1 预测每个障碍物的决策意图（9类），Stage 2 在各决策条件下生成障碍物多模态预测轨迹（9条/障碍物），Stage 3 通过交叉注意力解码自车多模态规划轨迹（N_R × N_L 条）。模型输出的决策、预测轨迹和规划轨迹作为下游多决策时空联合优化的输入。
 >
 
 ##### ① 问题形式
@@ -107,13 +107,13 @@
 | --- | --- |
 | A = {A₀, ..., Aₙₐ} | 动态障碍物集合，A₀为自车 |
 | O = {O₁, ..., Oₙₛ} | 静态障碍物集合 |
-| M | 地图 |
-| C | 交通信号等上下文 |
+| M | 地图（车道多边形 + 车道属性） |
+| C | 交通信号上下文（红绿灯历史状态序列） |
 | N | 导航信息（路线点、车道箭头、引导动作） |
 | T₀ | 自车输出的 N_R × N_L 条规划轨迹 |
 | π₀ | 每条轨迹的置信度分数 |
-| P₁:Nₐ | 障碍物预测轨迹 |
-| I₁:Nₐ | 自车对障碍物的决策意图 |
+| P₁:Nₐ | 障碍物多模态预测轨迹（每个障碍物 9 条决策条件化轨迹） |
+| I₁:Nₐ | 障碍物决策意图（每个障碍物 9 类纵×横联合决策概率） |
 
 
 ##### ② 数据处理
@@ -354,58 +354,22 @@ def get_effective_endpoint(obs_traj, obs_heading, valid_mask):
 > 对于"部分缺失"的情况，纵向判断的可靠性会降低（只看了2~4秒的结果），但仍然比不标注好。横向判断受影响较小，因为绕行动作通常在前几秒就能体现。
 >
 
-**数据增强（Data Augmentation）：**
-
-训练时对输入数据施加多种随机扰动，提升模型对感知噪声和定位误差的鲁棒性：
-
-| 增强类型 | 作用对象 | 具体方式 | 参数 |
-| :---: | :---: | --- | --- |
-| 自车航向角噪声 | 全局坐标系 | 每个 episode 开始时，以概率 `noise_prob` 对自车 pose 右乘一个 yaw 旋转矩阵，所有后续帧的定位都带上这个偏移 | yaw_noise_range（度），noise_prob |
-| 感知范围随机裁剪 | 障碍物/车道线 | 每帧随机缩放感知范围的上下左右边界，模拟感知距离波动 | noise_percep_range: ((min_x_range, max_x_range), (min_y_range, max_y_range)) |
-| 障碍物尺寸噪声 | 障碍物 bbox | 长度 ±0.1m，宽度/高度 ±0.05m 均匀随机噪声 | 固定范围 |
-| 障碍物位置噪声 | 障碍物角点 | 每个角点坐标 ±0.05m 均匀随机噪声 | 固定范围 |
-| 障碍物速度噪声 | 障碍物速度 | 纵向 ±0.1m/s，横向 ±0.05m/s 均匀随机噪声 | 固定范围 |
-| 障碍物随机丢弃 | 障碍物 mask | 以概率 `obj_drop_prob` 随机将部分障碍物标记为无效（模拟感知漏检） | obj_drop_prob |
-| 车道线随机丢弃 | 车道线 mask | 以概率 `line_drop_prob` 随机将部分车道线标记为无效（模拟感知漏检） | line_drop_prob |
-| 导航距离噪声 | 路口/引导距离 | 对 crosses_lane_dist 和 guides_act_dist 加 ±enhance_scale 均匀随机偏移 | lane_dist_enhance, guide_dist_enhance |
-
-
-**自车航向角噪声的实现细节：**
-
-```python
-# 每个 episode 重置时决定是否加噪声
-if random.random() < pose_noise_cfg["noise_prob"]:
-    yaw_noise = random.uniform(yaw_noise_range[0], yaw_noise_range[1])  # 单位：度
-    pose_noise = eye(4)
-    pose_noise[:3, :3] = euler_to_rmat([0, 0, yaw_noise * pi/180])     # 绕z轴旋转
-    self.pose_noise = pose_noise
-
-# 之后每帧定位都右乘这个噪声
-ego_pose = car.pose @ self.pose_noise  # 所有输入坐标都带上这个偏移
-
-# 提取GT标签时需要反向补偿
-ego_correct_pose = ego_pose @ inv(self.pose_noise)  # 去掉噪声得到真实pose
-```
-
-> 航向角噪声是 episode 级别的（整个序列共享同一个偏移），而非帧级别。这模拟的是"定位系统有固定偏差"的场景，迫使模型不过度依赖绝对航向，而是从相对运动和环境线索中推断方向。
->
-
 **车道线处理（process_lane_info）— 时序输入：**
 
 ```plain
 感知输出: pts(N,20,2), pts_xushi(N,19), pts_yanse(N,19), labels(N,), scores(N,)
   → 感知范围裁剪
   → 属性修正: 路沿(label=1)虚实/颜色清零，护栏(label=2)虚实设1/颜色清零
-  → 按置信度降序排列，截断到 max_instance (N_L)，不够的 padding 零
+  → 按置信度降序排列，截断到 max_instance (N_M)，不够的 padding 零
   → 缓存到历史队列
   → 时序打包（pack_temporal_info, hist_ts 帧历史）:
       对每个历史帧:
         ① 坐标补偿: rela_pose 变换 20 个采样点到当前帧
         ② 随机丢弃: 以 line_drop_prob 概率 mask 掉部分车道线
         ③ 计算时间差: lanes_time = now_time - frame_time
-  → 输出: lanes_pts (n_frame, N_L, 20, 2), lanes_pts_xushi (n_frame, N_L, 19),
-          lanes_pts_yanse (n_frame, N_L, 19), lanes_score (n_frame, N_L),
-          lanes_label (n_frame, N_L), lanes_time (n_frame,), lanes_mask (n_frame, N_L)
+  → 输出: lanes_pts (T_M, N_M, 20, 2), lanes_pts_xushi (T_M, N_M, 19),
+          lanes_pts_yanse (T_M, N_M, 19), lanes_score (T_M, N_M),
+          lanes_label (T_M, N_M), lanes_time (T_M,), lanes_mask (T_M, N_M)
 ```
 
 > 车道线为时序输入，与 LaneEncoder（时序编码）对齐。多帧叠加 + time_embedding 使模型对感知闪烁更鲁棒。
@@ -438,14 +402,14 @@ ego_correct_pose = ego_pose @ inv(self.pose_noise)  # 去掉噪声得到真实po
 感知输出: attr(3,) [左转灯状态, 直行灯状态, 右转灯状态], light_lsr(图像检测框)
   → 距离估算: 通过前视相机中灯的像素大小反推物理距离，上限200m
   → 距离过滤: >150m 时灯状态清零（太远不可靠）
-  → 缓存到历史队列（tsr_hist_num 帧）
+  → 缓存到历史队列（T_C 帧）
   → 倒序填充固定数组:
       从最新帧往回填，不够的保持零 + mask=True
   → 距离归一化: dist / 75（映射到 0~2 范围）
-  → 输出: attr (tsr_hist_num, 3), dist (tsr_hist_num,), mask (tsr_hist_num,)
+  → 输出: attr (T_C, 3), dist (T_C,), mask (T_C,)
 ```
 
-> 红绿灯为时序输入，与 TSREncoder 对齐。多帧历史状态使模型能感知信号灯变化趋势（如即将变绿）。
+> 红绿灯为时序输入，与 ContextEncoder 对齐。多帧历史状态使模型能感知信号灯变化趋势（如即将变绿）。
 >
 
 **导航数据提取与处理：**
@@ -468,8 +432,44 @@ ego_correct_pose = ego_pose @ inv(self.pose_noise)  # 去掉噪声得到真实po
 + 信号灯趋势感知：多帧红绿灯状态序列使模型能预判信号变化
 + 遮挡恢复：被遮挡的车道线在历史帧中可能可见
 
+**数据增强（Data Augmentation）：**
+
+训练时对输入数据施加多种随机扰动，提升模型对感知噪声和定位误差的鲁棒性：
+
+| 增强类型 | 作用对象 | 具体方式 | 参数 |
+| :---: | :---: | --- | --- |
+| 自车航向角噪声 | 全局坐标系 | 每个 episode 开始时，以概率 `noise_prob` 对自车 pose 右乘一个 yaw 旋转矩阵，所有后续帧的定位都带上这个偏移 | yaw_noise_range（度），noise_prob |
+| 感知范围随机裁剪 | 障碍物/车道线 | 每帧随机缩放感知范围的上下左右边界，模拟感知距离波动 | noise_percep_range: ((min_x_range, max_x_range), (min_y_range, max_y_range)) |
+| 障碍物尺寸噪声 | 障碍物 bbox | 长度 ±0.1m，宽度/高度 ±0.05m 均匀随机噪声 | 固定范围 |
+| 障碍物位置噪声 | 障碍物角点 | 每个角点坐标 ±0.05m 均匀随机噪声 | 固定范围 |
+| 障碍物速度噪声 | 障碍物速度 | 纵向 ±0.1m/s，横向 ±0.05m/s 均匀随机噪声 | 固定范围 |
+| 障碍物随机丢弃 | 障碍物 mask | 以概率 `obj_drop_prob` 随机将部分障碍物标记为无效（模拟感知漏检） | obj_drop_prob |
+| 车道线随机丢弃 | 车道线 mask | 以概率 `line_drop_prob` 随机将部分车道线标记为无效（模拟感知漏检） | line_drop_prob |
+| 导航距离噪声 | 路口/引导距离 | 对 crosses_lane_dist 和 guides_act_dist 加 ±enhance_scale 均匀随机偏移 | lane_dist_enhance, guide_dist_enhance |
+
+
 ##### ③ 编码器（Encoder）
 编码器将场景中所有元素统一编码为 D=128 维特征向量，再通过 Transformer 全局交互。
+
+**自车状态编码**
+
+| 全局坐标系特征 | 大小（T表示时间步数） |
+| :---: | --- |
+| position | np.zeros((T, 2), dtype=np.float64) |
+| heading | np.zeros((T), dtype=np.float64) |
+| velocity | np.zeros((T, 2), dtype=np.float64) |
+| acceleration | np.zeros((T, 2), dtype=np.float64) |
+| shape | np.zeros((T, 2), dtype=np.float64) |
+| valid_mask | np.ones(T, dtype=np.bool) |
+
+
+```python
+ego_state = [x, y, θ, v, a, δ, ω]  # 7维
+E_AV = StateAttentionEncoder(ego_state)  # → (bs, 1, D=128)
+```
+
+> 注：E_AV 已包含在 E_A 的第0个位置（A₀=自车），不单独拼接。
+>
 
 **Agent 编码（AgentEncoder）**
 
@@ -492,7 +492,7 @@ ego_correct_pose = ego_pose @ inv(self.pose_noise)  # 去掉噪声得到真实po
 + 更适用于长序列数据：减少内存占用，提高训练和推理效率。
 + 类似 CNN 的局部感受野：只在邻近的 token 之间计算注意力，提高泛化能力。
 
-每个 agent（自车+障碍物）的历史轨迹 T_H=20 帧，计算帧间差分得到运动特征：
+每个 agent（不含自车）的历史轨迹 T_H=20 帧，计算帧间差分得到运动特征：
 
 ```python
 agent_feature = torch.cat([
@@ -517,13 +517,13 @@ agent_feature = torch.cat([
 
 **地图编码（MapEncoder）— 时序编码**
 
-| 地图特征 | 大小（N_P 表示车道多边形数量） |
+| 地图特征 | 大小（N_M 表示单帧车道多边形数量；时序拼接 T_M = 20 帧） |
 | :---: | :---: |
-| point_position | (N_P, 20, 3, 2) |
-| point_vector | (N_P, 20, 2) |
-| point_orientation | (N_P, 20) |
-| polygon_center | (N_P, 2) |
-| valid_mask | (N_P,) |
+| point_position | (N_M, 20, 3, 2) |
+| point_vector | (N_M, 20, 2) |
+| point_orientation | (N_M, 20) |
+| polygon_center | (N_M, 2) |
+| valid_mask | (N_M, 1) |
 
 
 每条车道多边形取 20 个采样点，构造 10 维特征：
@@ -536,7 +536,7 @@ polygon_feature = torch.cat([
     point_orientation[:,:,0].sin(),                         # sin(θ) — 1维
     point_position[:,:,1] - point_position[:,:,0],         # 左边界偏移 — 2维
     point_position[:,:,2] - point_position[:,:,0],         # 右边界偏移 — 2维
-], dim=-1)  # → (bs, N_P, 20, 10)
+], dim=-1)  # → (bs, N_M, 20, 10)
 ```
 
 **时间嵌入（time_emb）实现：**
@@ -546,17 +546,17 @@ polygon_feature = torch.cat([
 ```python
 # 1. 正弦位置编码：将标量时间差映射到 D 维向量
 #    pos2posemb1d: 用不同频率的 sin/cos 生成位置编码
-#    输入: lanes_time (bs, n_frame, 1)
-#    输出: (bs, n_frame, D)
+#    输入: lanes_time (bs, T_M, 1)
+#    输出: (bs, T_M, D)
 time_pos = pos2posemb1d(lanes_time[..., None], num_pos_feats=D)
 
 # 2. 线性投影 + LayerNorm：将正弦编码映射到特征空间
 #    time_embedding = nn.Sequential(Linear(D, D), LayerNorm(D))
-time_emb = time_embedding(time_pos)  # (bs, n_frame, D)
+time_emb = time_embedding(time_pos)  # (bs, T_M, D)
 
 # 3. 广播加到每条车道线上：同一帧内所有车道线共享同一个时间嵌入
 lanes_feat = lanes_feat + time_emb[:, :, None, :]
-# time_emb[:, :, None, :] shape: (bs, n_frame, 1, D) → 广播到 (bs, n_frame, N_P, D)
+# time_emb[:, :, None, :] shape: (bs, T_M, 1, D) → 广播到 (bs, T_M, N_M, D)
 ```
 
 > 正弦位置编码的原理：用不同频率的 sin/cos 函数将连续时间值映射到高维空间，使模型能区分不同时刻。频率从低到高覆盖，低频捕捉粗粒度时间关系，高频捕捉细粒度时间差异。经过 Linear+LayerNorm 后投影到与其他特征相同的语义空间。
@@ -565,17 +565,54 @@ lanes_feat = lanes_feat + time_emb[:, :, None, :]
 编码流程（时序）：
 
 ```plain
-(bs, n_frame, N_P, 20, 10)
-  → reshape: (bs*n_frame*N_P, 20, 10)
-  → PointsEncoder 两层 max-pool: → (bs*n_frame*N_P, 128)
-  → reshape: (bs, n_frame, N_P, 128)
+(bs, T_M, N_M, 20, 10)
+  → reshape: (bs*T_M*N_M, 20, 10)
+  → PointsEncoder 两层 max-pool: → (bs*T_M*N_M, 128)
+  → reshape: (bs, T_M, N_M, 128)
   → + type_emb + on_route_emb + tl_emb + speed_limit_emb
   → + time_emb（正弦位置编码 → Linear → LayerNorm → 广播到每条车道线）
-  → reshape: (bs, n_frame*N_P, 128)
-  → 输出 E_P: (bs, N_M, D=128)  其中 N_M = n_frame * N_P
+  → reshape: (bs, T_M*N_M, 128)
+  → 输出 E_M: (bs, T_M*N_M, D=128)
 ```
 
 > 地图编码在原有单帧特征（点坐标、方向、边界偏移）基础上增加了时序维度：多帧地图感知结果叠加输入，通过时间嵌入区分不同时刻，使模型能感知地图元素的时序一致性。
+>
+
+**红绿灯编码（ContextEncoder）**
+
+| 红绿灯特征 | 大小（T_C = 20，历史交通灯帧数；N_C = 5，每帧 5 路特征：左灯/直灯/右灯/距离/时序） |
+| :---: | :---: |
+| tsr_feat | T_C × N_C  （= 20 × 5） |
+
+
+其中 3 路方向灯状态（attr 的左/直/右）+ 距离（dist）+ 时序位置共 5 路在编码阶段拼接为输入特征；`mask` 标记哪些历史帧有效（不计入 N_C）。
+
+```python
+# 输入: attr (bs, T_C, 3), dist (bs, T_C), mask (bs, T_C)
+
+left_embed = attr_embedding(attr[..., 0]) + left_embedding    # 左转灯状态嵌入
+straight_embed = attr_embedding(attr[..., 1]) + straight_embedding  # 直行灯状态嵌入
+right_embed = attr_embedding(attr[..., 2]) + right_embedding  # 右转灯状态嵌入
+dist_embed = dist_MLP(dist[..., None])                         # 距离嵌入
+time_embed = time_embedding                                    # 时序位置嵌入
+
+# 5 路特征作为独立 token：(T_C, N_C=5) 个 token，各自 D 维
+tsr_feat = MLP(stack([left_embed, straight_embed, right_embed, time_embed, dist_embed], dim=-2))
+# → (bs, T_C, N_C=5, D=128) → reshape → (bs, T_C*N_C, D=128)
+```
+
+编码流程：
+
+```plain
+attr (bs, T_C, 3) + dist (bs, T_C)
+  → 3个方向灯状态Embedding + 距离MLP + 时序Embedding
+  → 5 路特征独立 token（不再拼接为一路）→ MLP
+  → (bs, T_C, N_C, D=128)
+  → reshape: (bs, T_C*N_C, D=128)
+  → 输出 E_C: (bs, T_C*N_C, D=128)
+```
+
+> Context 编码器将红绿灯的历史状态序列编码为特征向量，使模型能感知信号灯变化趋势（如即将变绿），结合距离信息判断是否需要减速停车。
 >
 
 **静态障碍物编码（StaticObjectsEncoder）**
@@ -585,43 +622,6 @@ x = FourierEmbedding(shape)           # (N_S, 2) → (N_S, 128)
 x = x + category_embedding(category)  # + 类型嵌入
 # 输出 E_O: (bs, N_S, D=128)
 ```
-
-**红绿灯编码（TSREncoder）**
-
-| 红绿灯特征 | 大小（tsr_hist_num 表示历史帧数） |
-| :---: | :---: |
-| attr | np.zeros((tsr_hist_num, 3), dtype=np.int64) |
-| dist | np.zeros((tsr_hist_num,), dtype=np.float32) |
-| mask | np.ones((tsr_hist_num,), dtype=np.bool) |
-
-
-其中 `attr` 的 3 维分别对应左转灯、直行灯、右转灯的状态类别（num_attr_classes 种），`dist` 为红绿灯距离（归一化到 /75m），`mask` 标记哪些历史帧有效。
-
-```python
-# 输入: attr (bs, tsr_hist_num, 3), dist (bs, tsr_hist_num), mask (bs, tsr_hist_num)
-
-left_embed = attr_embedding(attr[..., 0]) + left_embedding    # 左转灯状态嵌入
-straight_embed = attr_embedding(attr[..., 1]) + straight_embedding  # 直行灯状态嵌入
-right_embed = attr_embedding(attr[..., 2]) + right_embedding  # 右转灯状态嵌入
-dist_embed = dist_MLP(dist[..., None])                         # 距离嵌入
-time_embed = time_embedding                                    # 时序位置嵌入
-
-tsr_feat = MLP(concat([left_embed, straight_embed, right_embed, time_embed, dist_embed]))
-# → (bs, tsr_hist_num, D=128)
-```
-
-编码流程：
-
-```plain
-attr (bs, tsr_hist_num, 3) + dist (bs, tsr_hist_num)
-  → 3个方向灯状态Embedding + 距离MLP + 时序Embedding
-  → concat 5路特征 → MLP
-  → (bs, tsr_hist_num, D=128)
-  → 输出 E_TSR: (bs, tsr_hist_num, D=128)
-```
-
-> TSR 编码器将红绿灯的历史状态序列编码为特征向量，使模型能感知信号灯变化趋势（如即将变绿），结合距离信息判断是否需要减速停车。
->
 
 **导航信息编码（NavigationEncoder）**
 
@@ -679,37 +679,17 @@ guides_act (bs, max_n_guide)
   → (bs, max_n_guide, D=128)  [每个引导一个token]
 
 合并: E_N = concat([route_token, lane_tokens, guide_tokens])
-     → (bs, 1+max_n_cross+max_n_guide, D=128)
+     → (bs, N_N, D=128)  其中 N_N = 1 + max_n_cross + max_n_guide
 ```
 
 > 导航编码器输出 E_N 参与 Transformer Encoder 的全局自注意力，使场景中所有元素都能感知导航意图。路线点提供几何引导（往哪弯），车道信息提供拓扑约束（哪条道能转），引导动作提供决策语义（应该做什么）。三者互补，缺一不可。
->
-
-**自车状态编码**
-
-| 全局坐标系特征 | 大小（T表示时间步数） |
-| :---: | --- |
-| position | np.zeros((T, 2), dtype=np.float64) |
-| heading | np.zeros((T), dtype=np.float64) |
-| velocity | np.zeros((T, 2), dtype=np.float64) |
-| acceleration | np.zeros((T, 2), dtype=np.float64) |
-| shape | np.zeros((T, 2), dtype=np.float64) |
-| valid_mask | np.ones(T, dtype=np.bool) |
-
-
-```python
-ego_state = [x, y, θ, v, a, δ, ω]  # 7维
-E_AV = StateAttentionEncoder(ego_state)  # → (bs, 1, D=128)
-```
-
-> 注：E_AV 已包含在 E_A 的第0个位置（A₀=自车），不单独拼接。
 >
 
 **Transformer Encoder（全局交互）**
 
 ```python
 # 拼接所有编码器输出
-x = concat([E_A, E_P, E_O, E_TSR, E_N], dim=1)  # (bs, N_A+N_P+N_S+N_TSR+N_N, 128)
+x = concat([E_A, E_O, E_M, E_C, E_N], dim=1)  # (bs, N_A + N_S + T_M*N_M + T_C*N_C + N_N, 128)
 x = x + FourierEmbedding(pos)            # 加入位置编码 PE
 
 # 4层全局自注意力
@@ -717,7 +697,7 @@ for blk in encoder_blocks:                # × L_enc=4
     x = blk(x, key_padding_mask)          # MHA + FFN + residual + LN
 x = LayerNorm(x)
 
-# 输出 E_enc: (bs, N_A+N_P+N_S, D=128)
+# 输出 E_enc: (bs, N_A + N_S + T_M*N_M + T_C*N_C + N_N, D=128)
 ```
 
 经过4层全局自注意力后，每个 token 已融合场景中所有其他元素的信息（包括导航路线、车道拓扑和引导动作）。
@@ -727,7 +707,9 @@ E_enc 的结构：
 
 + E_enc[:, 0] = 自车特征
 + E_enc[:, 1:N_A] = 障碍物特征（N_A-1 个）
-+ E_enc[:, N_A:] = 地图 + 静态物体特征
++ E_enc[:, N_A : N_A + N_S] = 静态障碍物特征
++ E_enc[:, N_A + N_S : N_A + N_S + T_M*N_M + T_C*N_C] = 地图特征（车道线 + 红绿灯）
++ E_enc[:, N_A + N_S + T_M*N_M + T_C*N_C :] = 导航特征
 
 **Stage 1：意图预测**
 
