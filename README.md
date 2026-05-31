@@ -3121,8 +3121,6 @@ $ J(\tau) = \phi(x_T) + \sum_{t=0}^{T-1} l(x_t, u_t) $
 ###### 求解流程
 iLQR 求解分为五个步骤：初始化标称轨迹、沿标称轨迹局部近似、反向递推（Backward Pass）、前向滚动（Forward Pass）、收敛判断。
 
-[此处为语雀卡片，点击链接查看](https://www.yuque.com/ersan-ih2uc/ayh7it/zpfgrt2p1cb375eo#OK0yl)
-
 对应代码主循环（`ilqr_core.cpp`）：
 
 ```cpp
