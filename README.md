@@ -137,12 +137,21 @@
 **自车状态处理（process_ego_state_info）：**
 
 ```plain
-定位模块输出: pose(4x4), vel(m/s), acc(m/s²), wheel_angle(rad)
-  → 提取当前帧自车速度标量 ego_vel
-  → 输出: ego_vel (1,) — 当前车速，作为模型的自车状态输入
+定位模块输出: pose(4x4), vel(m/s), acc(m/s²), wheel_angle(rad), yaw_rate(rad/s)
+人机交互输入: turn_signal ∈ {0=关, 1=左拨杆, 2=右拨杆}
+  → 提取当前帧自车 7 维运动状态:
+      x, y      ← pose[:2, 3]                 (位置)
+      θ         ← pose 旋转矩阵反解            (航向)
+      v         ← vel                          (速度标量)
+      a         ← acc                          (纵向加速度)
+      δ         ← wheel_angle                  (前轮转角)
+      ω         ← yaw_rate                     (偏航角速度)
+  → 输出: ego_state (7,) = [x, y, θ, v, a, δ, ω]
+          turn_signal (1,)
+          —— 二者作为模型的自车输入
 ```
 
-> 模型不输入自车历史轨迹，仅输入当前帧速度标量。自车的运动历史信息通过障碍物/车道线的时序输入隐式获取（历史帧坐标已补偿到当前帧，帧间位置差异反映了自车运动）。
+> 模型不输入自车历史轨迹，仅输入**当前帧** 7 维运动状态与拨杆信号；运动历史信息通过障碍物/车道线的时序输入隐式获取（历史帧坐标已补偿到当前帧，帧间位置差异反映了自车运动）。拨杆信号显式表达驾驶员的变道意图，让模型在变道触发时能直接响应而无需依靠场景推断。
 >
 
 **障碍物处理（process_obstacle_info）：**
@@ -460,13 +469,17 @@ def get_effective_endpoint(obs_traj, obs_heading, valid_mask):
 | velocity | np.zeros((T, 2), dtype=np.float64) |
 | acceleration | np.zeros((T, 2), dtype=np.float64) |
 | shape | np.zeros((T, 2), dtype=np.float64) |
+| turn_signal | np.zeros((1,), dtype=np.int64) |
 | valid_mask | np.ones(T, dtype=np.bool) |
 
 
 ```python
-ego_state = [x, y, θ, v, a, δ, ω]  # 7维
-E_AV = StateAttentionEncoder(ego_state)  # → (bs, 1, D=128)
+ego_state = [x, y, θ, v, a, δ, ω]                      # 7维连续运动状态
+turn_signal_emb = turn_signal_embedding(turn_signal)   # nn.Embedding(3, D)，{0关 / 1左 / 2右}
+E_AV = StateAttentionEncoder(ego_state) + turn_signal_emb  # → (bs, 1, D=128)
 ```
+
+> 拨杆信号通过 `nn.Embedding(num_classes=3, dim=D)` 查表得到 D 维嵌入，与运动状态编码相加后融入 E_AV，使得变道触发时刻自车 token 直接携带"我要往左/往右"的语义。
 
 > 注：E_AV 已包含在 E_A 的第0个位置（A₀=自车），不单独拼接。
 >
