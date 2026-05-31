@@ -147,14 +147,8 @@
 
 **障碍物处理（process_obstacle_info）：**
 
-障碍物数据处理包括**离线预处理**和**在线处理**两部分：
-
-**离线预处理（数据清洗）：**
-
 + **时间间隔均匀化**：原始数据时间间隔不均匀或者两帧数据相同，采用 PchipInterpolator 对障碍物位置(x,y)重采样，使时间间隔为 0.1s
 + **静止障碍物轨迹异常**：感知误差导致静止物体有微小位移。处理方法：判断障碍物属性，将静止物体轨迹优化为 0
-
-**在线处理（模型输入构造）：**
 
 ```plain
 感知输出: objs_location(N,3), objs_dims(N,3), objs_rotation_z(N,), objs_velocity_abs(N,2), objs_label(N,), objs_score(N,)
