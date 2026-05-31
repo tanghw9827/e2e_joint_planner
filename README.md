@@ -523,7 +523,15 @@ agent_feature = torch.cat([
 | point_vector | (N_M, 20, 2) |
 | point_orientation | (N_M, 20) |
 | polygon_center | (N_M, 2) |
+| lane_type | (N_M, 1) |
+| speed_limit | (N_M, 1) |
 | valid_mask | (N_M, 1) |
+
+
+几何特征（point_*、polygon_center、valid_mask）刻画车道**形状**；属性特征刻画车道**语义**：
+
++ `lane_type`：车道类型 ID（普通车道 / 匝道 / 应急车道 / HOV 等），离散值，查表 Embedding
++ `speed_limit`：该车道限速（km/h），连续值，傅里叶编码
 
 
 每条车道多边形取 20 个采样点，构造 10 维特征：
@@ -569,7 +577,7 @@ lanes_feat = lanes_feat + time_emb[:, :, None, :]
   → reshape: (bs*T_M*N_M, 20, 10)
   → PointsEncoder 两层 max-pool: → (bs*T_M*N_M, 128)
   → reshape: (bs, T_M, N_M, 128)
-  → + type_emb + on_route_emb + tl_emb + speed_limit_emb
+  → + type_emb + speed_limit_emb（lane_type 查表 Embedding；speed_limit 傅里叶连续编码）
   → + time_emb（正弦位置编码 → Linear → LayerNorm → 广播到每条车道线）
   → reshape: (bs, T_M*N_M, 128)
   → 输出 E_M: (bs, T_M*N_M, D=128)
