@@ -107,9 +107,9 @@
 | --- | --- |
 | A = {A₀, ..., Aₙₐ} | 动态障碍物集合，A₀为自车 |
 | O = {O₁, ..., Oₙₛ} | 静态障碍物集合 |
-| M | 地图（车道多边形 + 车道属性） |
+| M | 地图 |
 | C | 交通信号上下文（红绿灯历史状态序列） |
-| N | 导航信息（路线点、车道箭头、引导动作） |
+| N | 导航信息（路线点、车道属性、导航动作） |
 | T₀ | 自车输出的 N_R × N_L 条规划轨迹 |
 | π₀ | 每条轨迹的置信度分数 |
 | P₁:Nₐ | 障碍物多模态预测轨迹（每个障碍物 9 条决策条件化轨迹） |
@@ -117,7 +117,7 @@
 
 
 ##### ② 数据处理
-基于plan_debug_msg的定位时间**localization_timestamp，**找到与其最近的loc_msg，提取自车、障碍物及地图及导航信息，通过数据清洗得到最终数据
+基于plan_debug_msg的定位时间localization_timestamp，找到与其最近的loc_msg，提取自车、障碍物、地图及导航信息，通过数据清洗得到最终数据
 
 **定位信息处理：**
 
@@ -138,7 +138,7 @@
 
 ```plain
 定位模块输出: pose(4x4), vel(m/s), acc(m/s²), wheel_angle(rad), yaw_rate(rad/s)
-人机交互输入: turn_signal ∈ {0=关, 1=左拨杆, 2=右拨杆}
+交互输入: turn_signal ∈ {0=关, 1=左拨杆, 2=右拨杆}
   → 提取当前帧自车 7 维运动状态:
       x, y      ← pose[:2, 3]                 (位置)
       θ         ← pose 旋转矩阵反解            (航向)
@@ -151,7 +151,7 @@
           —— 二者作为模型的自车输入
 ```
 
-> 模型不输入自车历史轨迹，仅输入**当前帧** 7 维运动状态与拨杆信号；运动历史信息通过障碍物/车道线的时序输入隐式获取（历史帧坐标已补偿到当前帧，帧间位置差异反映了自车运动）。拨杆信号显式表达驾驶员的变道意图，让模型在变道触发时能直接响应而无需依靠场景推断。
+> 模型不输入自车历史轨迹，仅输入当前帧 7 维运动状态与拨杆信号；拨杆信号显式表达驾驶员的变道意图，让模型在变道触发时能直接响应而无需依靠场景推断。
 >
 
 **障碍物处理（process_obstacle_info）：**
@@ -368,17 +368,15 @@ def get_effective_endpoint(obs_traj, obs_heading, valid_mask):
 ```plain
 感知输出: pts(N,20,2), pts_xushi(N,19), pts_yanse(N,19), labels(N,), scores(N,)
   → 感知范围裁剪
-  → 属性修正: 路沿(label=1)虚实/颜色清零，护栏(label=2)虚实设1/颜色清零
-  → 按置信度降序排列，截断到 max_instance (N_M)，不够的 padding 零
+  → 按置信度降序排列，截断到 max_instance (N_L)，不够的 padding 零
   → 缓存到历史队列
   → 时序打包（pack_temporal_info, hist_ts 帧历史）:
       对每个历史帧:
         ① 坐标补偿: rela_pose 变换 20 个采样点到当前帧
         ② 随机丢弃: 以 line_drop_prob 概率 mask 掉部分车道线
         ③ 计算时间差: lanes_time = now_time - frame_time
-  → 输出: lanes_pts (T_M, N_M, 20, 2), lanes_pts_xushi (T_M, N_M, 19),
-          lanes_pts_yanse (T_M, N_M, 19), lanes_score (T_M, N_M),
-          lanes_label (T_M, N_M), lanes_time (T_M,), lanes_mask (T_M, N_M)
+  → 输出: lanes_pts (T_M, N_L, 20, 2),
+          lanes_time (T_M,), lanes_mask (T_M, N_L)
 ```
 
 > 车道线为时序输入，与 LaneEncoder（时序编码）对齐。多帧叠加 + time_embedding 使模型对感知闪烁更鲁棒。
@@ -415,7 +413,7 @@ def get_effective_endpoint(obs_traj, obs_heading, valid_mask):
   → 倒序填充固定数组:
       从最新帧往回填，不够的保持零 + mask=True
   → 距离归一化: dist / 75（映射到 0~2 范围）
-  → 输出: attr (T_C, 3), dist (T_C,), mask (T_C,)
+  → 输出: attr (T_C, 3), dist (T_C, 1), mask (T_C, 1)
 ```
 
 > 红绿灯为时序输入，与 ContextEncoder 对齐。多帧历史状态使模型能感知信号灯变化趋势（如即将变绿）。
@@ -424,6 +422,23 @@ def get_effective_endpoint(obs_traj, obs_heading, valid_mask):
 **导航数据提取与处理：**
 
 除自车/障碍物/车道线数据外，还需提取高德导航信息（amap_navi），为模型提供全局路线引导。导航数据的处理流程：
+
+```python
+lane_info = {
+    "dist": 150.0,                    # 距路口距离
+    "back_lanes": [                   # 路口前车道
+        {"lane_action": 1},           # 车道1: 左转
+        {"lane_action": 0},           # 车道2: 直行
+        {"lane_action": 3}            # 车道3: 右转
+    ],
+    "front_lanes": [                  # 路口后车道
+        {"lane_action": 1},           # 对应车道1
+        {"lane_action": 0},           # 对应车道2
+        {"lane_action": 3}            # 对应车道3
+    ],
+    "extend_lanes": []                # 无扩展车道
+}
+```
 
 | 处理步骤 | 功能说明 |
 | :---: | --- |
@@ -476,7 +491,7 @@ def get_effective_endpoint(obs_traj, obs_heading, valid_mask):
 ```python
 ego_state = [x, y, θ, v, a, δ, ω]                      # 7维连续运动状态
 turn_signal_emb = turn_signal_embedding(turn_signal)   # nn.Embedding(3, D)，{0关 / 1左 / 2右}
-E_AV = StateAttentionEncoder(ego_state) + turn_signal_emb  # → (bs, 1, D=128)
+E_AV = StateDropoutAttentionEncoder(ego_state) + turn_signal_emb  # → (bs, 1, D=128)
 ```
 
 > 拨杆信号通过 `nn.Embedding(num_classes=3, dim=D)` 查表得到 D 维嵌入，与运动状态编码相加后融入 E_AV，使得变道触发时刻自车 token 直接携带"我要往左/往右"的语义。
@@ -530,18 +545,15 @@ agent_feature = torch.cat([
 
 **地图编码（MapEncoder）— 时序编码**
 
-| 地图特征 | 大小（N_M 表示单帧车道多边形数量；时序拼接 T_M = 20 帧） |
+| 地图特征 | 大小（N_M 为车道多边形数量，n_p = 20 为采样点数） |
 | :---: | :---: |
-| point_position | (N_M, 20, 3, 2) |
-| point_vector | (N_M, 20, 2) |
-| point_orientation | (N_M, 20) |
-| polygon_center | (N_M, 2) |
-| lane_type | (N_M, 1) |
-| speed_limit | (N_M, 1) |
-| valid_mask | (N_M, 1) |
+| F_P (polygon_feature) | (N_M, n_p, 10) |
+| lane_type | (N_M,) |
+| speed_limit | (N_M,) |
+| valid_mask | (N_M, n_p) |
 
 
-几何特征（point_*、polygon_center、valid_mask）刻画车道**形状**；属性特征刻画车道**语义**：
+几何特征（point_*、valid_mask）刻画车道**形状**；属性特征刻画车道**语义**：
 
 + `lane_type`：车道类型 ID（普通车道 / 匝道 / 应急车道 / HOV 等），离散值，查表 Embedding
 + `speed_limit`：该车道限速（km/h），连续值，傅里叶编码
